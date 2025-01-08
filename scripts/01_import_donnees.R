@@ -114,27 +114,13 @@ ROE_Normandie <-
 
 # Obtenir les obstacles principals et secondaires (à voir avec Benoît ou faire à partir des ouvrages liés)
 
-ROE_Normandie <-
-  ROE_Normandie %>% tidyr::separate(ouvrages_lies, c('ouvl_1', 'ouvl_2', 'ouvl_3', 'ouvl_4', 'ouvl_5','ouvl_6', 'ouvl_7', 'ouvl_8'), "-")
-  ROE_Normandie <-
-  ROE_Normandie %>% dplyr::mutate(
-    ouv_liaison = dplyr::case_when(is.na(ouvrages_lies) & ROE != across(starts_with('ROE')) ~ 'Principal',
-                                   ROE == ouvrages_lies ~ "Secondaire",
-                                   is.na(ouvrages_lies) & ROE == starts_with('ROE') ~ 'Secondaire',
-                                   ROE != ouvrages_lies ~ "Principal",
-                                   is.na(ouvrages_lies) ~ "Principal"
-                                   ))
+
 
 ###### Ajout des hauteurs de chute à partir d'une extraction en flux provenant de BDOE ######
 
 #Données du flux geobs (temporaire)
 
-Hauteur <- readr::read_delim(
-  "data/hauteur_chute.csv",
-  delim = ";",
-  escape_double = FALSE,
-  trim_ws = TRUE
-)
+Hauteur <- bdoe$hauteur_chute
 
 #Transfo_Hauteur#
 
@@ -143,27 +129,23 @@ Hauteur <-
   dplyr::rename('ROE' = 'ouv_id',
                 'hauteur' = 'hco_hauteur',
                 'date_mesure' = 'hco_date_mesure') %>%
-  as.data.frame()
+  as.data.frame() 
 
 #Ajout des hauteurs de chutes + modifictation des NA en date la plus ancienne possible + création des classes de hauteur de chute#
 
 ROE_Normandie_H <-
   dplyr::left_join(ROE_Normandie, Hauteur, by = 'ROE')
 
-ROE_Normandie_H$date_mesure <-
-  as.character(ROE_Normandie_H$date_mesure)
 ROE_Normandie_H <-
-  ROE_Normandie_H %>% dplyr::mutate(date_mesure = dplyr::case_when(is.na(date_mesure) ~ "1970-01-01",
+  ROE_Normandie_H %>% dplyr::mutate(date_mesure = dplyr::case_when(is.na(date_mesure) ~ as.Date("1970-01-01", "%Y-%m-%d"),
                                                                    TRUE ~ date_mesure)) %>%
   dplyr::group_by(ROE) %>%
   dplyr::filter(date_mesure == max(date_mesure)) %>%
   dplyr::filter(hauteur == min(hauteur)) %>%
   dplyr::ungroup(ROE) %>%
-  dplyr::filter(!(is.na(hauteur))) %>%
-  dplyr::distinct(ROE, .keep_all = TRUE) %>%
+  dplyr::distinct() %>% 
   dplyr::mutate(
-    date_mesure =  dplyr::case_when(date_mesure == "1970-01-01" ~ "NA",
-                                    TRUE ~ date_mesure),
+    date_mesure = as.Date(gsub("1970-01-01", "NA", date_mesure)),
     classe_hauteur = dplyr::case_when(
       hauteur < 1 / 2 ~ "Inférieur à 0.5m",
       hauteur  >= 1 / 2 & hauteur < 1 ~ 'De 0.5m à inférieur à 1m',
@@ -178,10 +160,6 @@ ROE_Normandie_H <-
   dplyr::relocate(c('hauteur', 'classe_hauteur', 'date_mesure'), .after = 'Nom_ouvrage') %>%
   as.data.frame()
 
-#dplyr::filter(date_mesure == max(date_mesure),
-#hauteur == min(hauteur),
-#!(is.na(hauteur))) %>%
-
 #####Gérer les fautes d'orthographe####
 
 ROE_Normandie_H <-
@@ -190,22 +168,13 @@ ROE_Normandie_H <-
 
 ##### Obtention des métriques du cours d'eau à partir de PHRYMO #####
 
-Info_LB <- readr::read_delim(
-  "data/usra_LB.csv",
-  delim = ",",
-  escape_double = FALSE,
-  trim_ws = TRUE,
-  na = 'NA'
-)
-Info_NOR <- readr::read_delim(
-  "data/usra_NOR.csv",
-  delim = ",",
-  escape_double = FALSE,
-  trim_ws = TRUE,
-  na = 'NA'
-)
+Info_LB <- vroom::vroom(
+  "data/usra_LB.csv")
 
-Info <- dplyr::full_join(Info_LB, Info_NOR)
+Info_NOR <- vroom::vroom(
+  "data/usra_NOR.csv")
+
+Info <- dplyr::bind_rows(Info_LB, Info_NOR)
 
 Info <-
   Info %>% dplyr::rename('nom_CE'='toponyme','alt_am' = 'zamont', 'alt_av' = 'zaval') %>% 
@@ -223,8 +192,6 @@ Info <-
   dplyr::ungroup(nom_CE) %>% 
   unique()
 
-#Ajout des métriques de CE au tableau de données
+##### Sauvegarder les objets utiles à la réalisation des prochains scripts ####
 
-ROE_Normandie_H <-
-  dplyr::left_join(ROE_Normandie_H, Info, by = 'nom_CE')
-
+save(ROE_Normandie_H, Info, file = "data/data.RData")
