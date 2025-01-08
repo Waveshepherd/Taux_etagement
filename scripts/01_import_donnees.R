@@ -28,18 +28,22 @@ normandie_area <-
 ROE_Normandie <- 
   r4geobs::get_geobs_data_wfs("REFERENTIEL_ROE_MONDE", normandie_area)
 
-## Chargement du flux Geobs (pour les hauteurs) ##
+## Chargement des données BDOE issues de Geobs (pour les hauteurs) ##
 
-bdoe <- r4geobs::get_bdoe_data(login = "augustin.soki-makilutila@ofb.gouv.fr",
-                       mdp = 'Motdepasse20240802',
-                       nom_dossier = "data/bdoe", 
-                       lecture = TRUE)
+if(!file.exists("data")) { dir.create("data") }
+
+bdoe <- 
+  r4geobs::get_bdoe_data(login = Sys.getenv("GEOBS_LOGIN"),
+                         mdp = Sys.getenv("GEOBS_MDP"),
+                         nom_dossier = "data/bdoe", 
+                         lecture = TRUE)
 
 #### Sélection des données utiles du flux Geobs pour la Normandie ######
 
 
 ROE_Normandie <-
-  ROE_Normandie %>% dplyr::filter(
+  ROE_Normandie %>% 
+  dplyr::filter(
     dept_nom %in% c('MANCHE', 'CALVADOS', 'SEINE-MARITIME', 'ORNE', 'EURE'),
     statut_nom != 'Gelé'
   ) %>%
@@ -89,14 +93,14 @@ ROE_Normandie <-
     'fnt',
     'usage1',
     'usage2'
-  ) %>%
-  as.data.frame()
+  )
   
 
 ## Choix de se baser la BD topo pour le nom des cours d'eau ##
 
 ROE_Normandie <-
-  ROE_Normandie %>% dplyr::mutate(
+  ROE_Normandie %>% 
+  dplyr::mutate(
     nom_carthage = gsub("fleuve ", "", nom_carthage),
     nom_carthage = gsub("rivière ", "", nom_carthage),
     nom_carthage = dplyr::case_when(!is.na(nom_carthage) ~ nom_carthage,
