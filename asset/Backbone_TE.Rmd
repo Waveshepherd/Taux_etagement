@@ -1,0 +1,222 @@
+---
+title: "![](OFB_Logo.jpg){width=25%} R.O.E Référentiel des Obstacles à l'Ecoulement"
+subtitle: "Synthèse des ouvrages par cours d'eau"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+  )
+
+setwd("C:/Users/a.soki-makilutila/Desktop/Documents/ROE/Seine-Maritime")
+
+library(tidyverse)
+library(tidyr)
+library(plyr)
+library(tibble)
+library(shiny)
+library(rJava)
+library(readxl)
+library(readr)
+library(knitr)
+library(ggplot2)
+library(ggrepel)
+library(patchwork)
+library(plotly)
+library(dplyr)
+library(DT)
+library(reactable)
+library(scales)
+
+
+
+Info <- read_delim("Info_SM.csv", 
+                        delim = ";", escape_double = FALSE, trim_ws = TRUE, na ='NA')
+
+ROE_SM <- read_delim("ROE_Seine_Maritime.csv", 
+                        delim = ";", escape_double = FALSE, trim_ws = TRUE, na ='NA')
+
+#Organiser les classe de hauteur comme des facteurs pour les barplots
+
+ROE_SM$classe_hauteur <- as.factor(ROE_SM$classe_hauteur)
+ROE_SM$code_ME <- as.factor(ROE_SM$code_ME)
+ROE_SM$etat <- as.factor(ROE_SM$etat)
+ROE_SM$classe_hauteur <- fct_relevel(ROE_SM$classe_hauteur, c('Inférieur à 0.5m','De 0.5m à inférieur à 1m','De 1m à inférieur à 1.5m', 'De 1.5m à inférieur à 2m', 'De 2m à inférieur à 3m', 'De 3m à inférieur à 5m', 'De 5m à inférieur à 10m', 'Supérieur à 10m'))
+
+```
+
+## Présentation du cours d'eau
+
+```{r Input}
+inputPanel(
+  shiny::selectInput("CE", "Choisir un cours ' eau :", choices = Info$toponyme, selected = "l'yères")
+        )
+
+```
+
+```{r Infos CE}
+    output$tab_info <- renderTable({
+      tab_info <- filter(Info,Info$toponyme == input$CE)
+      
+
+    })
+
+tableOutput("tab_info")
+```
+
+## Nombre d'ouvrages
+
+```{r Infos ouvrages}
+
+    output$tab_ouv <- renderTable({
+      
+      #Nombre d'ouvrage sur le cours d'eau + Nb ouvrages principal
+      tab_info <- filter(Info, Info$toponyme == input$CE)
+      ouv <- filter(ROE_SM, ROE_SM$nom_CE == input$CE)
+      ouv_p <- filter(ouv, ouv$ouv_liaison == "Principal")
+      z <- by(ouv_p,ouv_p$ouv_liaison,nrow) / tab_info$longueur
+      z <- round(z,2)
+      tab_ouv <- data.frame(Nombre_ouvrages = by(ouv,ouv$nom_CE,nrow), Nombre_ouvrages_princip = by(ouv_p,ouv_p$ouv_liaison,nrow), Densite_ouvrages = z)
+ 
+    })
+
+      
+
+tableOutput("tab_ouv")
+```
+
+
+## Répartition des hauteurs de chute
+
+
+```{r Barplot des classes de hauteur de chute}
+output$ch <- renderPlotly({
+  
+  tab_ch <- filter(ROE_SM, ROE_SM$nom_CE == input$CE) 
+  ch <- ggplot(tab_ch, aes(x = classe_hauteur, fill = etat)) +
+    geom_bar() +
+    xlab("Intervals de hauteur de chute (m)") + ylab("Nombre d'ouvrages") +
+    labs(fill = "État :")
+})
+
+plotlyOutput("ch")
+```
+
+## État des ouvrage sur le cours principal
+
+```{r}
+
+    output$tab_etat <- renderTable({
+      
+      ouv <- filter(ROE_SM, ROE_SM$nom_CE == input$CE)
+      ouv_p <- filter(ouv, ouv$ouv_liaison == "Principal")
+      etat <- count(ouv_p, "etat")
+      etat <- mutate(etat, proportion = freq / by(ouv_p,ouv_p$ouv_liaison,nrow))
+      
+      tab_ouv <- data.frame(etat = "Nombre total d'ouvrages",freq = as.numeric(by(ouv_p,ouv_p$ouv_liaison,nrow)), proportion = 100)
+      tab_ouv <- bind_rows(etat, tab_ouv)
+ 
+    })
+
+      
+
+tableOutput("tab_etat")
+```
+
+## Taux d'étagement
+
+```{r}
+
+    output$tab_deniv <- renderTable({
+      
+      ouv <- filter(ROE_SM, ROE_SM$nom_CE == input$CE)
+      ouv_p <- filter(ouv, ouv$ouv_liaison == "Principal")
+    
+       
+      #Création du tableau des dénivelées artificielles cumulées
+      
+      h_existant <- 0
+      h_detruit_part <- 0
+      h_detruit_enti <- 0
+    
+ 
+      for (i in 1:as.numeric(by(ouv_p,ouv_p$ouv_liaison,nrow))) {
+        
+          if (ouv_p$etat[i] == "Existant"){
+            h_existant <- ouv_p$hauteur[i] + h_existant
+          }
+          else if (ouv_p$etat[i] == "Détruit partiellement"){
+            h_detruit_part <- ouv_p$hauteur[i] + h_detruit_part
+          }
+          else if (ouv_p$etat[i] == "Détruit entièrement"){
+            h_detruit_enti <- ouv_p$hauteur[i] + h_detruit_enti
+          }
+      }
+      
+      h_tot <- h_existant + h_detruit_part + h_detruit_enti
+      
+      tab_deniv <- data.frame(h_existant = h_existant, h_detruit_part = h_detruit_part, h_detruit_enti = h_detruit_enti, h_tot = h_tot)
+      tab_prop <- data.frame(h_existant = h_existant / h_tot * 100, h_detruit_part = h_detruit_part / h_tot * 100, h_detruit_enti = h_detruit_enti / h_tot * 100, h_tot = 100)
+      tab_deniv <- rbind(tab_deniv,tab_prop)
+
+
+    })      
+
+tableOutput("tab_deniv")
+
+
+```
+
+```{r}
+
+output$h <- renderText({
+  
+      tab_info <- filter(Info,Info$toponyme == input$CE)
+      ouv <- filter(ROE_SM, ROE_SM$nom_CE == input$CE)
+      ouv_p <- filter(ouv, ouv$ouv_liaison == "Principal")
+    
+       
+      #Création du tableau des dénivelées artificielles cumulées
+      
+      h_existant <- 0
+      h_detruit_part <- 0
+      h_detruit_enti <- 0
+    
+ 
+      for (i in 1:as.numeric(by(ouv_p,ouv_p$ouv_liaison,nrow))) {
+        
+          if (ouv_p$etat[i] == "Existant"){
+            h_existant <- ouv_p$hauteur[i] + h_existant
+          }
+          else if (ouv_p$etat[i] == "Détruit partiellement"){
+            h_detruit_part <- ouv_p$hauteur[i] + h_detruit_part
+          }
+          else if (ouv_p$etat[i] == "Détruit entièrement"){
+            h_detruit_enti <- ouv_p$hauteur[i] + h_detruit_enti
+          }
+      }
+      
+      h_tot <- h_existant + h_detruit_part + h_detruit_enti
+  
+  tab_ME <- ROE_SM %>%  separate(col = matches("code_ME"), sep = '-', c("code_ME","code_CE")) %>%  select("nom_CE", "code_ME")
+tab_ME <- tab_ME %>% unique() %>%  na.omit()
+tab_ME <- tab_ME %>% filter(nom_CE == input$CE)
+TE <- h_tot / tab_info$deni_nat
+
+h <- paste("Le taux d'étagement de la masse d'eau : ", tab_ME$code_ME, " est de : ", TE, "%")
+
+    
+
+})      
+
+textOutput("h")
+
+```
+
+

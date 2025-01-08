@@ -38,6 +38,14 @@ bdoe <-
                          nom_dossier = "data/bdoe", 
                          lecture = TRUE)
 
+## Chargement des données PHRYMO ##
+
+Info_LB <- vroom::vroom(
+  "//ad.intra/dfs/COMMUNS/REGIONS/nor/DR/OFB/SIG/DR/IG_METIER/CONTINUITE/PHRYMO/usra_LB.csv")
+
+Info_NOR <- vroom::vroom(
+  "//ad.intra/dfs/COMMUNS/REGIONS/nor/DR/OFB/SIG/DR/IG_METIER/CONTINUITE/PHRYMO/usra_NOR.csv")
+
 #### Sélection des données utiles du flux Geobs pour la Normandie ######
 
 
@@ -171,12 +179,6 @@ ROE_Normandie_H <-
                                                               TRUE ~ nom_CE))
 
 ##### Obtention des métriques du cours d'eau à partir de PHRYMO #####
-
-Info_LB <- vroom::vroom(
-  "data/usra_LB.csv")
-
-Info_NOR <- vroom::vroom(
-  "data/usra_NOR.csv")
 
 Info <- dplyr::bind_rows(Info_LB, Info_NOR)
 
