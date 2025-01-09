@@ -116,11 +116,11 @@ plotlyOutput("ch")
       
       ouv <- filter(ROE_SM, ROE_SM$nom_CE == input$CE)
       ouv_p <- filter(ouv, ouv$ouv_liaison == "Principal")
-      etat <- count(ouv_p, "etat")
+      etat <- count(ouv_p, etat)
       etat <- mutate(etat, proportion = freq / by(ouv_p,ouv_p$ouv_liaison,nrow))
       
-      tab_ouv <- data.frame(etat = "Nombre total d'ouvrages",freq = as.numeric(by(ouv_p,ouv_p$ouv_liaison,nrow)), proportion = 100)
-      tab_ouv <- bind_rows(etat, tab_ouv)
+      tab_etat <- data.frame(etat = "Nombre total d'ouvrages",freq = as.numeric(by(ouv_p,ouv_p$ouv_liaison,nrow)), proportion = 100)
+      tab_etat <- bind_rows(etat, tab_etat)
  
     })
 

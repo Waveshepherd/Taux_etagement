@@ -26,24 +26,148 @@ load("../data/data.RData")
 
 ## Situation du cours d'eau
 
-```{r}
+```{r Info CE}
 
 '%>%' <- dplyr::'%>%'
-ROE_Normandie_H$nom_CE <- as.factor(ROE_Normandie_H$nom_CE)
-tab_me <- ROE_Normandie_H %>%  separate(col = matches("code_ME"), sep = '-', c("code_ME","code_CE")) %>%  dplyr::select("nom_CE", "code_ME")  %>% unique() %>%  na.omit()
-Info <- left_join(Info, tab_me, join_by('nom_CE'))
-Info_CE <- Info %>%  dplyr::relocate(c('code_ME'), .before = 'nom_CE') %>% dplyr::filter(nom_CE == params$CE)
 
-knitr::kable(Info_CE)
+
+tab_me <-
+  ROE_Normandie_H %>%  dplyr::mutate(nom_CE = dplyr::case_when(nom_CE == "NA" ~ NA,
+                                                               TRUE ~ nom_CE)) %>%
+  tidyr::separate(col =  tidyr::matches("code_ME"),
+                  sep = '-',
+                  c("code_ME", "code_CE")) %>%
+  dplyr::select("nom_CE", "code_ME")  %>%
+  unique() %>%
+  na.omit() %>%
+  dplyr::group_by(nom_CE) %>%
+  dplyr::summarise_all( ~ paste(., collapse = ' - '))
+
+Info <- dplyr::left_join(Info, tab_me, dplyr::join_by('nom_CE'))
+Info_CE <-
+  Info %>%  dplyr::relocate(c('code_ME'), .before = 'nom_CE') %>% 
+  dplyr::filter(nom_CE == params$CE) 
+  
+
+kableExtra::kbl(
+  Info_CE,
+  col.names = c(
+    "Code de la Masse d'eau",
+    "Nom du cours d'eau",
+    "Longueur du cours d'eau (en km)",
+    "Altitute du point le plus en aval (en m)",
+    "Altitude du point le plus en amout (en m)",
+    "Dénivelé naturel (en m)",
+    "Pente naturelle (en ‰)"
+  )
+) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+## Nombre d'ouvrages
+
+```{r Info ouvrages}
+
+tab_CE <-
+  ROE_Normandie_H %>% dplyr::filter(nom_CE == params$CE) %>%  sf::st_drop_geometry()
+
+ouv_p <-
+  tab_CE %>% dplyr::filter(ouv_liaison == "ouvrage principal") %>%  sf::st_drop_geometry()
+
+tab_ouv <-
+  ouv_p %>% 
+  dplyr::mutate(nb_ouv = nrow(tab_CE),
+                nb_ouvp = nrow(ouv_p),
+                d_ouvp = round(nrow(ouv_p)/Info_CE$longueur, 2)) %>% 
+  dplyr::select(nom_CE, nb_ouv, nb_ouvp, d_ouvp) %>% 
+  unique()
+
+kableExtra::kbl(
+  tab_ouv,
+  col.names = c(
+    "Nom du cours d'eau",
+    "Nombre d'ouvrages",
+    "Nombre d'ouvrages sur le cours principal",
+    "Densité d'ouvarge sur le cours le cours principal par km"
+  )
+) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+## Répartition des hauteurs de chute
+
+```{r Barplot classe_hauteur et etat, fig.width = 11, fig.height = 6}
+
+ch <-
+  ggplot2::ggplot(tab_CE, ggplot2::aes(x = classe_hauteur, fill = etat)) +
+  ggplot2::geom_bar(ggplot2::aes(x = factor(
+    classe_hauteur,
+    level = c(
+      "Inférieur à 0.5m",
+      'De 0.5m à inférieur à 1m',
+      'De 1m à inférieur à 1.5m',
+      'De 1.5m à inférieur à 2m',
+      'De 2m à inférieur à 3m',
+      'De 3m à inférieur à 5m',
+      'De 5m à inférieur à 10m',
+      'Supérieur à 10m'
+    )
+  ))) +
+  ggplot2::xlab("Intervals de hauteur de chute (m)") + ggplot2::ylab("Nombre d'ouvrages") +
+  ggplot2::labs(fill = "État :")
+
+ch
+  
 ```
 
 
-```{r}
-      ouv <- ROE_Normandie_H %>% filter(nom_CE == params$CE) %>%  sf::st_drop_geometry()
-      ouv_p <- ouv %>% filter(ouv_liaison == "ouvrage principal") %>%  sf::st_drop_geometry()
-      z <- round(by(ouv_p,ouv_p$ouv_liaison,nrow) / Info_CE$longueur,2)
-      tab_ouv <- unique(data.frame(row.names = c(params$CE), Nombre_ouvrages = nrow(ouv), Nombre_ouvrages_princip = nrow(ouv_p), Densite_ouvrages = z))
- knitr::kable(tab_ouv)      
-    
+## État des ouvrage sur le cours principal
+
+```{r etat ouvarges principaux}
+
+tab_etat <- ouv_p %>%
+  dplyr::count(etat) %>%
+  dplyr::mutate(prop = round(n / nrow(ouv_p), 2)) %>%
+  dplyr::rename(
+    "État" = "etat",
+    "Nombre d'ouvrages" = "n",
+    "Proportion (en %)" = "prop"
+  )
+
+kableExtra::kbl(tab_etat) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+      
 ```
 
+## Taux d'étagement
+
+```{r TE}
+
+tab_TE <- ouv_p %>%
+  dplyr::group_by(etat) %>% 
+  dplyr::mutate(Hauteur_cumul = sum(hauteur)) %>% 
+  dplyr::ungroup(etat) %>% 
+  dplyr::select(etat, Hauteur_cumul) %>% 
+  unique() %>% 
+  dplyr::mutate(prop = round(Hauteur_cumul/sum(Hauteur_cumul)*100,2)) %>%
+  dplyr::rename(
+    "État" = "etat",
+    "Hauteurs cumulées" = "Hauteur_cumul",
+    "Rapport des hauteurs cumulées sur la pente naturelle (en %)" = "prop"
+  )
+
+kableExtra::kbl(
+  tab_TE,
+  col.names = c(
+     "État",
+    "Hauteurs cumulées",
+    "Rapport des hauteurs cumulées sur la pente naturelle (en %)"
+  )
+) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+Le taux d'étagement de la masse d'eau : ``r Info_CE$code_ME`` est de : ``r round(apply(tab_TE[2],2,sum)/Info_CE$deni_nat*100,2)``%.
