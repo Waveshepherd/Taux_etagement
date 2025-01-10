@@ -82,7 +82,7 @@ tableOutput("tab_info")
       ouv_p <- filter(ouv, ouv$ouv_liaison == "Principal")
       z <- by(ouv_p,ouv_p$ouv_liaison,nrow) / tab_info$longueur
       z <- round(z,2)
-      tab_ouv <- data.frame(Nombre_ouvrages = by(ouv,ouv$nom_CE,nrow), Nombre_ouvrages_princip = by(ouv_p,ouv_p$ouv_liaison,nrow), Densite_ouvrages = z)
+      tab_ouv <- data.frame(Nombre_ouvrages = nrow(ouv), Nombre_ouvrages_princip = nrow(ouv_p), Densite_ouvrages = z)
  
     })
 
@@ -218,5 +218,4 @@ h <- paste("Le taux d'étagement de la masse d'eau : ", tab_ME$code_ME, " est de
 textOutput("h")
 
 ```
-
 

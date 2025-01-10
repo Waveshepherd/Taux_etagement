@@ -13,14 +13,16 @@
 
 #Délimitation de la zone dans laquelle les données sont récupérées (Normandie)
 
-bbox_normandie <- 
-  c(xmin = -1.944580,
+bbox_normandie <-
+  c(
+    xmin = -1.944580,
     ymin = 48.133101,
     xmax = 1.966553,
-    ymax = 50.145226) %>%
+    ymax = 50.145226
+  ) %>%
   sf::st_bbox(crs = 4326)
 
-normandie_area <- 
+normandie_area <-
   bbox_normandie %>%
   sf::st_as_sfc() %>%
   sf::st_sf()
@@ -32,27 +34,33 @@ ROE_Normandie <-
 
 ## Chargement des données BDOE issues de Geobs (pour les hauteurs) ##
 
-if(!file.exists("data")) { dir.create("data") }
+if (!file.exists("data")) {
+  dir.create("data")
+}
 
-bdoe <- 
-  r4geobs::get_bdoe_data(login = Sys.getenv("GEOBS_LOGIN"),
-                         mdp = Sys.getenv("GEOBS_MDP"),
-                         nom_dossier = "data/bdoe", 
-                         lecture = TRUE)
+bdoe <-
+  r4geobs::get_bdoe_data(
+    login = Sys.getenv("GEOBS_LOGIN"),
+    mdp = Sys.getenv("GEOBS_MDP"),
+    nom_dossier = "data/bdoe",
+    lecture = TRUE
+  )
 
 ## Chargement des données PHRYMO ##
 
 Info_LB <- vroom::vroom(
-  "//ad.intra/dfs/COMMUNS/REGIONS/nor/DR/OFB/SIG/DR/IG_METIER/CONTINUITE/PHRYMO/usra_LB.csv")
+  "//ad.intra/dfs/COMMUNS/REGIONS/nor/DR/OFB/SIG/DR/IG_METIER/CONTINUITE/PHRYMO/usra_LB.csv"
+)
 
 Info_NOR <- vroom::vroom(
-  "//ad.intra/dfs/COMMUNS/REGIONS/nor/DR/OFB/SIG/DR/IG_METIER/CONTINUITE/PHRYMO/usra_NOR.csv")
+  "//ad.intra/dfs/COMMUNS/REGIONS/nor/DR/OFB/SIG/DR/IG_METIER/CONTINUITE/PHRYMO/usra_NOR.csv"
+)
 
 #### Sélection des données utiles du flux Geobs pour la Normandie ######
 
 
 ROE_Normandie <-
-  ROE_Normandie %>% 
+  ROE_Normandie %>%
   dplyr::filter(
     dept_nom %in% c('MANCHE', 'CALVADOS', 'SEINE-MARITIME', 'ORNE', 'EURE'),
     statut_nom != 'Gelé'
@@ -104,12 +112,12 @@ ROE_Normandie <-
     'usage1',
     'usage2'
   )
-  
+
 
 ## Choix de se baser la BD topo pour le nom des cours d'eau ##
 
 ROE_Normandie <-
-  ROE_Normandie %>% 
+  ROE_Normandie %>%
   dplyr::mutate(
     nom_carthage = gsub("fleuve ", "", nom_carthage),
     nom_carthage = gsub("rivière ", "", nom_carthage),
@@ -126,9 +134,24 @@ ROE_Normandie <-
   dplyr::select(!(nom_carthage)) %>%
   dplyr::rename("nom_CE" = "nom_topo")
 
-# Obtenir les obstacles principals et secondaires (à voir avec Benoît ou faire à partir des ouvrages liés)
+# Obtenir les obstacles principals et secondaires
 
+ouvrages_lies_liste <-
+  ROE_Normandie %>%
+  dplyr::filter(!is.na(ouvrages_lies)) %>%
+  pull(ouvrages_lies) %>%
+  gsub(" - ", "|", .) %>%
+  paste(collapse = "|")
 
+ROE_Normandie <-
+  ROE_Normandie %>%
+  dplyr::mutate(
+    ouv_liaison  = dplyr::case_when(
+      stringr::str_detect(ROE, ouvrages_lies_liste) ~ "ouvrage secondaire",
+      TRUE ~ "ouvrage principal"
+    )
+  ) %>%
+  dplyr::relocate(c('ouv_liaison'), .after = 'ouvrages_lies')
 
 ###### Ajout des hauteurs de chute à partir d'une extraction en flux provenant de BDOE ######
 
@@ -143,7 +166,7 @@ Hauteur <-
   dplyr::rename('ROE' = 'ouv_id',
                 'hauteur' = 'hco_hauteur',
                 'date_mesure' = 'hco_date_mesure') %>%
-  as.data.frame() 
+  as.data.frame()
 
 #Ajout des hauteurs de chutes + modifictation des NA en date la plus ancienne possible + création des classes de hauteur de chute#
 
@@ -151,13 +174,15 @@ ROE_Normandie_H <-
   dplyr::left_join(ROE_Normandie, Hauteur, by = 'ROE')
 
 ROE_Normandie_H <-
-  ROE_Normandie_H %>% dplyr::mutate(date_mesure = dplyr::case_when(is.na(date_mesure) ~ as.Date("1970-01-01", "%Y-%m-%d"),
-                                                                   TRUE ~ date_mesure)) %>%
+  ROE_Normandie_H %>% dplyr::mutate(date_mesure = dplyr::case_when(
+    is.na(date_mesure) ~ as.Date("1970-01-01", "%Y-%m-%d"),
+    TRUE ~ date_mesure
+  )) %>%
   dplyr::group_by(ROE) %>%
   dplyr::filter(date_mesure == max(date_mesure)) %>%
   dplyr::filter(hauteur == min(hauteur)) %>%
   dplyr::ungroup(ROE) %>%
-  dplyr::distinct() %>% 
+  dplyr::distinct() %>%
   dplyr::mutate(
     date_mesure = as.Date(gsub("1970-01-01", "NA", date_mesure)),
     classe_hauteur = dplyr::case_when(
@@ -174,6 +199,8 @@ ROE_Normandie_H <-
   dplyr::relocate(c('hauteur', 'classe_hauteur', 'date_mesure'), .after = 'Nom_ouvrage') %>%
   as.data.frame()
 
+## Mettre
+
 #####Gérer les fautes d'orthographe####
 
 ROE_Normandie_H <-
@@ -185,19 +212,23 @@ ROE_Normandie_H <-
 Info <- dplyr::bind_rows(Info_LB, Info_NOR)
 
 Info <-
-  Info %>% dplyr::rename('nom_CE'='toponyme','alt_am' = 'zamont', 'alt_av' = 'zaval') %>% 
+  Info %>% dplyr::rename('nom_CE' = 'toponyme',
+                         'alt_am' = 'zamont',
+                         'alt_av' = 'zaval') %>%
   dplyr::select(nom_CE, longueur, alt_av, alt_am) %>%
   dplyr::filter(alt_av != 0) %>%
-  dplyr::group_by(nom_CE) %>% 
-  dplyr::mutate(nom_CE = gsub("fleuve ","",nom_CE),
-                nom_CE = gsub("rivière ","",nom_CE)) %>% 
-  dplyr::mutate(longueur = sum(longueur)*0.001,
-                alt_am = max(alt_am),
-                alt_av = min(alt_av),
-                deni_nat = alt_am - alt_av,
-                pt_nat = deni_nat / longueur) %>% 
-  dplyr::mutate_if(is.numeric, round, 2) %>% 
-  dplyr::ungroup(nom_CE) %>% 
+  dplyr::group_by(nom_CE) %>%
+  dplyr::mutate(nom_CE = gsub("fleuve ", "", nom_CE),
+                nom_CE = gsub("rivière ", "", nom_CE)) %>%
+  dplyr::mutate(
+    longueur = sum(longueur) * 0.001,
+    alt_am = max(alt_am),
+    alt_av = min(alt_av),
+    deni_nat = alt_am - alt_av,
+    pt_nat = deni_nat / longueur
+  ) %>%
+  dplyr::mutate_if(is.numeric, round, 2) %>%
+  dplyr::ungroup(nom_CE) %>%
   unique()
 
 ##### Sauvegarder les objets utiles à la réalisation des prochains scripts ####

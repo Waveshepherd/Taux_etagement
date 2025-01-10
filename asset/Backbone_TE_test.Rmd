@@ -1,0 +1,49 @@
+---
+title: "R.O.E Référentiel des Obstacles à l'Ecoulement `r params$CE`"
+subtitle: "Synthèse des ouvrages par cours d'eau"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: 
+  html_document:
+    highlight: pygment 
+params: 
+  CE: "l'yères"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+  )
+
+library(tidyverse)
+
+load("../data/data.RData")
+
+```
+
+## Situation du cours d'eau
+
+```{r}
+
+'%>%' <- dplyr::'%>%'
+ROE_Normandie_H$nom_CE <- as.factor(ROE_Normandie_H$nom_CE)
+tab_me <- ROE_Normandie_H %>%  separate(col = matches("code_ME"), sep = '-', c("code_ME","code_CE")) %>%  dplyr::select("nom_CE", "code_ME")  %>% unique() %>%  na.omit()
+Info <- left_join(Info, tab_me, join_by('nom_CE'))
+Info_CE <- Info %>%  dplyr::relocate(c('code_ME'), .before = 'nom_CE') %>% dplyr::filter(nom_CE == params$CE)
+
+knitr::kable(Info_CE)
+```
+
+
+```{r}
+      ouv <- ROE_Normandie_H %>% filter(nom_CE == params$CE) %>%  sf::st_drop_geometry()
+      ouv_p <- ouv %>% filter(ouv_liaison == "ouvrage principal") %>%  sf::st_drop_geometry()
+      z <- round(by(ouv_p,ouv_p$ouv_liaison,nrow) / Info_CE$longueur,2)
+      tab_ouv <- unique(data.frame(row.names = c(params$CE), Nombre_ouvrages = nrow(ouv), Nombre_ouvrages_princip = nrow(ouv_p), Densite_ouvrages = z))
+ knitr::kable(tab_ouv)      
+    
+```
+
