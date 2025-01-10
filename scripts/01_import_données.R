@@ -9,6 +9,8 @@
 
 ## Chargement du flux QGIS ##
 
+'%>%' <- dplyr::'%>%'
+
 #Délimitation de la zone dans laquelle les données sont récupérées (Normandie)
 
 bbox_normandie <-
@@ -27,8 +29,8 @@ normandie_area <-
 
 #Chargement du flux
 
-ROE_Normandie <-
-  r4geobs::get_geobs_data_wfs("REFERENTIEL_ROE_MONDE", normandie_area)
+ROE_Normandie <- 
+  r4geobs::get_geobs_wfs_data("REFERENTIEL_ROE_MONDE", normandie_area)
 
 ## Chargement des données BDOE issues de Geobs (pour les hauteurs) ##
 
