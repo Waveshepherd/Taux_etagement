@@ -25,8 +25,9 @@ library(tidyverse)
 load("../data/data.RData")
 
 ```
+<br>
 
-## Situation du cours d'eau
+# [Situation du cours d'eau]{.underline}
 
 <br>
 
@@ -71,7 +72,7 @@ kableExtra::kbl(
 
 <br>
 
-## Nombre d'ouvrages
+# [Nombre d'ouvrages]{.underline}
 
 <br>
 
@@ -106,7 +107,7 @@ kableExtra::kbl(
 
 <br>
 
-## Répartition des hauteurs de chute
+# [Répartition des hauteurs de chute]{.underline}
 
 <br>
 
@@ -140,7 +141,7 @@ Ce graphique présente le nombre d'ouvrage par intervals de hauteur de chute pr�
 
 <br>
 
-## État des ouvrage sur le cours principal
+# [État des ouvrage sur le cours principal]{.underline}
 
 <br>
 
@@ -162,7 +163,7 @@ kableExtra::kbl(tab_etat) %>%
 
 <br>
 
-## Taux d'étagement
+# [Taux d'étagement]{.underline}
 
 <br>
 
@@ -199,16 +200,16 @@ kableExtra::kbl(
 
 <br>
 
-Le taux d'étagement de la masse d'eau : ``r Info_CE$code_ME`` est de : ``r round(apply(tab_TE[2],2,sum)/Info_CE$deni_nat*100,2)``%.
+**Le taux d'étagement de la masse d'eau : ``r Info_CE$code_ME`` est de : ``r round(apply(tab_TE[2],2,sum)/Info_CE$deni_nat*100,2)``%.**
 
 <br>
 
-## Carte du cours d'eau
+# [Carte du cours d'eau]{.underline}
 
 <br>
 
 <center> 
-```{r}
+```{r Carte CE}
 
 
 tab_CE <-
