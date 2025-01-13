@@ -1,5 +1,5 @@
 ---
-title: "![](OFB_Logo.jpg){width=50%}R.O.E Référentiel des Obstacles à l'Écoulement `r params$CE`"
+title: "![](OFB_Logo.jpg){width=25%}R.O.E Référentiel des Obstacles à l'Écoulement `r params$CE`"
 subtitle: "Synthèse des ouvrages par cours d'eau"
 date:  "`r format(Sys.time(), '%d %B %Y')`"
 output: 
@@ -27,6 +27,8 @@ load("../data/data.RData")
 ```
 
 ## Situation du cours d'eau
+
+<br>
 
 ```{r Info CE}
 
@@ -67,7 +69,11 @@ kableExtra::kbl(
 
 ```
 
+<br>
+
 ## Nombre d'ouvrages
+
+<br>
 
 ```{r Info ouvrages}
 
@@ -98,7 +104,11 @@ kableExtra::kbl(
 
 ```
 
+<br>
+
 ## Répartition des hauteurs de chute
+
+<br>
 
 ```{r Barplot classe_hauteur et etat, fig.width = 11, fig.height = 6}
 
@@ -124,9 +134,15 @@ ch
   
 ```
 
-Ce graphique vous présente le nombre d'ouvrage par intervals de de hauteur de chute présent sur le cours d'eau. Vous pouvez également observer la proportion d'ouvrage en fonction de leur état.  
+<br>
+
+Ce graphique présente le nombre d'ouvrage par intervals de hauteur de chute présent sur le cours d'eau. Nous pouvons également observer la proportion d'ouvrage en fonction de leur état.  
+
+<br>
 
 ## État des ouvrage sur le cours principal
+
+<br>
 
 ```{r etat ouvarges principaux}
 
@@ -144,10 +160,15 @@ kableExtra::kbl(tab_etat) %>%
       
 ```
 
+<br>
+
 ## Taux d'étagement
 
-Le taux d'étagement est un indiacteur qui reflète la perte de pente naturelle due à la présence d'ouvrages transversaux. Il permet de rendre compte de la perte de continuité longitudinale induite par des ruptures artificielles. Le seuil maximum, fixé par par le SDAGE 2022/2027, àne pas dépasser est de 30%. Cependant, il est précisé que le taux d'étgement doit être le plus bas possible pour les masses d'eau à enjeux. Ce taux d'étagement est calculé comme suit : $$ TE = \sum_{HC}\frac{1}{pt} $$
+<br>
 
+Le taux d'étagement est un indiacteur qui reflète la perte de pente naturelle due à la présence d'ouvrages transversaux. Il permet de rendre compte de la perte de continuité longitudinale induite par des ruptures artificielles. Le seuil maximum, fixé par le SDAGE 2022/2027, à ne pas dépasser est de 30%. Cependant, il est précisé que le taux d'étagement doit être le plus bas possible pour les masses d'eau à enjeux. Ce taux d'étagement est calculé comme suit : $$ TE = \sum_{HC}\frac{1}{pt} $$
+
+<br>
 
 ```{r TE}
 
@@ -176,11 +197,19 @@ kableExtra::kbl(
 
 ```
 
-Le taux d'étagement de la masse d'eau : ``r Info_CE$code_ME`` est de : ``r round(apply(tab_TE[2],2,sum)/Info_CE$deni_nat*100,2)``%.     
+<br>
+
+Le taux d'étagement de la masse d'eau : ``r Info_CE$code_ME`` est de : ``r round(apply(tab_TE[2],2,sum)/Info_CE$deni_nat*100,2)``%.
+
+<br>
 
 ## Carte du cours d'eau
 
+<br>
+
+<center> 
 ```{r}
+
 
 tab_CE <-
   ROE_Normandie_H %>% dplyr::filter(stringr::str_detect(nom_CE, params$CE)) %>%
@@ -200,5 +229,7 @@ leaflet::leaflet(tab_CE) %>%
     stroke = FALSE,
     fillOpacity = 0.8
   )
-```
 
+
+```
+</center>
