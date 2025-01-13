@@ -16,7 +16,7 @@
 
 library(tidyverse)
 #library(tidyr) <- fait partie de tidyverse
-library(plyr)
+#library(plyr)
 #library(tibble) <- fait partie de tidyverse
 library(shiny)
 library(rJava)
@@ -35,3 +35,4 @@ library(rlang)
 library(rvest)
 
 library(r4geobs)
+library(vroom)
