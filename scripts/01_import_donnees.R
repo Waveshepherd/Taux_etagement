@@ -236,4 +236,4 @@ Info <-
 
 ##### Sauvegarder les objets utiles à la réalisation des prochains scripts ####
 
-save(ROE_Normandie_H, Info, file = "data/data.RData")
+save(ROE_Normandie_H, Info, file = "data_prepared/ROE_data.RData")
