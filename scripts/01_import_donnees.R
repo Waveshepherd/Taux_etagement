@@ -56,8 +56,11 @@ Info_NOR <- vroom::vroom(
   "//ad.intra/dfs/COMMUNS/REGIONS/nor/DR/OFB/SIG/DR/IG_METIER/CONTINUITE/PHRYMO/usra_NOR.csv"
 )
 
-#### Sélection des données utiles du flux Geobs pour la Normandie ######
+Info <- 
+  dplyr::bind_rows(Info_LB, Info_NOR)
 
+
+#### Sélection des données utiles du flux Geobs pour la Normandie ######
 
 ROE_Normandie <-
   ROE_Normandie %>%
@@ -139,7 +142,7 @@ ROE_Normandie <-
 ouvrages_lies_liste <-
   ROE_Normandie %>%
   dplyr::filter(!is.na(ouvrages_lies)) %>%
-  pull(ouvrages_lies) %>%
+  dplyr::pull(ouvrages_lies) %>%
   gsub(" - ", "|", .) %>%
   paste(collapse = "|")
 
@@ -210,13 +213,11 @@ ROE_Normandie_H <-
 
 ##### Obtention des métriques du cours d'eau à partir de PHRYMO #####
 
-Info <- 
-  dplyr::bind_rows(Info_LB, Info_NOR)
-
 Info <-
-  Info %>% dplyr::rename('nom_CE' = 'toponyme',
-                         'alt_am' = 'zamont',
-                         'alt_av' = 'zaval') %>%
+  Info %>% 
+  dplyr::rename('nom_CE' = 'toponyme',
+                'alt_am' = 'zamont',
+                'alt_av' = 'zaval') %>%
   dplyr::select(nom_CE, longueur, alt_av, alt_am) %>%
   dplyr::filter(alt_av != 0) %>%
   dplyr::group_by(nom_CE) %>%
