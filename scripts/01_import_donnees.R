@@ -62,10 +62,21 @@ Info <-
 
 #### Sélection des données utiles du flux Geobs pour la Normandie ######
 
-nrow(ROE_Normandie)
+# nrow(ROE_Normandie) 9751 lignes
 
 ROE_Normandie <-
   ROE_Normandie %>%
+  dplyr::mutate(dept_nom = dplyr::case_when(
+    identifiant_roe %in% c('ROE14725', 
+                           'ROE117117', 
+                           'ROE119897',
+                           'ROE119898') ~ 'MANCHE',
+    identifiant_roe %in% c('ROE27825', 
+                           'ROE21617') ~ 'CALVADOS',
+    identifiant_roe %in% c('ROE54558',
+                           'ROE88613') ~ 'SEINE-MARITIME',
+    TRUE ~ dept_nom
+  )) %>%
   dplyr::filter(
     dept_nom %in% c('MANCHE', 'CALVADOS', 'SEINE-MARITIME', 'ORNE', 'EURE'),
     statut_nom != 'Gelé'
