@@ -153,6 +153,7 @@ ROE_Normandie <-
   dplyr::mutate(
     ouv_liaison  = dplyr::case_when(
       stringr::str_detect(ROE, ouvrages_lies_liste) ~ "ouvrage secondaire",
+      is.na(ouvrages_lies) ~ "ouvrage principal",
       TRUE ~ "ouvrage principal"
     )
   ) %>%
