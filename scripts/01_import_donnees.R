@@ -124,8 +124,6 @@ ROE_Normandie <-
 ROE_Normandie <-
   ROE_Normandie %>%
   dplyr::mutate(
-    nom_carthage = gsub("fleuve ", "", nom_carthage),
-    nom_carthage = gsub("rivière ", "", nom_carthage),
     nom_carthage = dplyr::case_when(!is.na(nom_carthage) ~ nom_carthage,
                                     TRUE ~ 'NA'),
     nom_topo = dplyr::case_when(is.na(nom_topo) ~ "NA",
@@ -133,8 +131,12 @@ ROE_Normandie <-
                                 TRUE ~ nom_topo),
     nom_topo = dplyr::case_when(
       nom_carthage != 'NA' & nom_topo == 'NA' ~ nom_carthage,
-      TRUE ~ nom_topo
-    )
+      TRUE ~ nom_topo),
+    nom_topo = gsub("fleuve ", "", nom_topo),
+    nom_topo = gsub("rivière ", "", nom_topo),
+    nom_topo = gsub(" fleuve", "", nom_topo),
+    nom_topo = gsub(" rivière", "", nom_topo),
+    nom_topo = stringr::str_replace_all(nom_topo, pattern = "[[:punct:]]", replacement = " ")
   ) %>%
   #dplyr::select(!(nom_carthage)) %>%
   dplyr::rename("nom_CE" = "nom_topo")
