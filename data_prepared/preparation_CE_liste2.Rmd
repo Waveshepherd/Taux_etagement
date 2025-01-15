@@ -1,0 +1,127 @@
+---
+title: "Preparation CE Liste 2"
+author: "BR"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(sf)
+library(r4geobs)
+
+load("ROE_data.RData")
+```
+
+
+## Objectif(s)
+
+- Récupérer l'information du classement **Liste 2** des tronçons de cours d'eau (au titre de l'article L.214-17) pour les ouvrages ROE.
+
+## Méthodo employée 
+
+1. Récupération de la couche spatiale des tronçons de cours d'eau classés **Liste 2**.
+
+2. Buffer de 50 mètres autour des tronçons de cours d'eau classés **Liste 2**.
+
+3. Intersection ouvrages ROE et tronçons de cours d'eau classés **Liste 2** (union de la couche tronçons de cours d'eau classés **Liste 2** car des zones de chevauchement existent ! → créer des doublons).
+
+4. Certains ouvrages n'ont pas le classement malgré leur proximité *ET* nom de cours d'eau... → Etape supplémentaire pour l'identification.
+
+  - Calculs des distances "ouvrages ROE" / "tronçons **Liste 2**"
+  - Recodage *manuel* en **Liste 2** pour les ouvrages ROE situés à moins de 100m **ET** situé sur un cours d'eau dont le classement **Liste 2** est déjà connu. 
+
+## Résultats
+
+```{r liste2, echo=FALSE}
+### Récupération des données CE Liste 2 sur l'entité spatiale - Buffer de XXm
+CE_liste2 <- 
+  r4geobs::get_classCE_wfs(geo = bbox_normandie, liste = "Liste2") %>% 
+  sf::st_buffer(dist = units::set_units(50, m)) %>% 
+  dplyr::select(CodeEuZone, NomZone, ListeClassement)
+
+### Création d'un polygone unique pour l'ensemble des entités spatiales Liste2 
+### (-> croisement de certains secteurs = duplication lignes au moment de l'intersection !)
+CE_liste2_union <- 
+  CE_liste2 %>% 
+  sf::st_union() %>% 
+  data.frame() %>% 
+  sf::st_as_sf() %>% 
+  sf::st_make_valid()
+
+### Intersection des points ROE_Normandie et CE_liste2_union (buffer)
+
+ROE_Normandie_H2 <-
+  ROE_Normandie_H %>% 
+  dplyr::mutate(CE_liste2 = lengths(sf::st_intersects(., CE_liste2_union)),
+         CE_liste2 = dplyr::if_else(CE_liste2 == 1, "Liste2", "???"),
+         dist_CE_liste2 = round(as.numeric(sf::st_distance(msGeometry, CE_liste2_union)),2))
+```
+
+- Carto rapide :
+
+```{r map, echo=FALSE}
+mapview::mapview(ROE_Normandie_H2, zcol = "CE_liste2", cex = 2.5, col.regions = c("red", "yellow")) +
+  mapview::mapview(CE_liste2_union, color = "grey10", col.regions = 'grey80')
+```
+  
+- Raccrochage 2ème round :
+
+Recodage *manuel* en **Liste 2** pour les ouvrages ROE situés à moins de 100m **ET** situé sur un cours d'eau dont le classement **Liste 2** est déjà connu. 
+
+```{r}
+nom_CE_liste2 <-
+  ROE_Normandie_H2 %>% 
+  dplyr::filter(CE_liste2 == 'Liste2') %>% 
+  pull(nom_CE) %>% 
+  unique() %>% 
+  sort() %>% 
+  paste(collapse = "|")
+```
+
+```{r}
+ROE_Normandie_H3 <-
+  ROE_Normandie_H2 %>% 
+  mutate(CE_liste2_r2 = dplyr::case_when(
+             stringr::str_detect(nom_CE, nom_CE_liste2) & dist_CE_liste2 <= 100 & CE_liste2 == '???' ~ "Liste2",
+             TRUE ~ NA_character_)) 
+
+# ROE_Normandie_H3 %>% 
+#   select(ROE, nom_CE, dist_CE_liste2, CE_liste2, CE_liste2_r2) %>% View()
+#   filter(nom_CE == "la risle") %>% mapview::mapview() +
+#   mapview::mapview(CE_liste2_union, color = "red")
+```
+
+```{r map2, echo=FALSE}
+mapview::mapview(ROE_Normandie_H2, 
+                 zcol = "CE_liste2", cex = 2.5, col.regions = c("red", "yellow"),
+                 layer.name = c("Ouvrages en L2 - 1er round")) +
+  mapview::mapview(ROE_Normandie_H3 %>% filter(!is.na(CE_liste2_r2)), 
+                   zcol = "CE_liste2_r2", cex = 2.5, col.regions = c("orange"), 
+                   layer.name = c("Ouvrages en L2 - 2eme round")) +
+  mapview::mapview(ROE_Normandie_H3 %>% filter(!is.na(CE_liste2_r2) & nom_CE == 'NA'), 
+                   zcol = "CE_liste2_r2", cex = 2.5, col.regions = c("violet"), 
+                   layer.name = c("Ouvrages sans Nom de CE en L2")) +
+  mapview::mapview(CE_liste2_union, color = "grey10", col.regions = 'grey80')
+```
+  
+```{r}
+ROE_Normandie_H_final <-
+  ROE_Normandie_H3 %>% 
+  mutate(CE_liste2_f = case_when(CE_liste2 == "Liste2" & is.na(CE_liste2_r2) ~ CE_liste2,
+                                 CE_liste2 == "???" & !is.na(CE_liste2_r2) ~ CE_liste2_r2,
+                                 TRUE ~ "NA")) %>% 
+  select(-c(CE_liste2, CE_liste2_r2))
+
+mapview::mapview(ROE_Normandie_H_final, 
+                 zcol = "CE_liste2_f", cex = 2.5, col.regions = c("orange","red"),
+                 layer.name = c("Ouvrages en L2 FINAL")) +
+mapview::mapview(CE_liste2_union, color = "grey10", col.regions = 'grey80')
+
+                                 
+```
+ 
+  
