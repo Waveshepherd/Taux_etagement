@@ -29,7 +29,7 @@ normandie_area <-
 
 #Chargement du flux
 
-ROE_Normandie <- 
+ROE_Normandie_initial <- ROE_Normandie <- 
   r4geobs::get_geobs_wfs_data("REFERENTIEL_ROE_MONDE", normandie_area)
 
 ## Chargement des données BDOE issues de Geobs (pour les hauteurs) ##
@@ -61,6 +61,8 @@ Info <-
 
 
 #### Sélection des données utiles du flux Geobs pour la Normandie ######
+
+nrow(ROE_Normandie)
 
 ROE_Normandie <-
   ROE_Normandie %>%
@@ -117,7 +119,7 @@ ROE_Normandie <-
   )
 
 
-## Choix de se baser la BD topo pour le nom des cours d'eau ##
+## Choix de se baser sur la BD Topo (= BD topage) pour le nom des cours d'eau ##
 
 ROE_Normandie <-
   ROE_Normandie %>%
@@ -134,7 +136,7 @@ ROE_Normandie <-
       TRUE ~ nom_topo
     )
   ) %>%
-  dplyr::select(!(nom_carthage)) %>%
+  #dplyr::select(!(nom_carthage)) %>%
   dplyr::rename("nom_CE" = "nom_topo")
 
 # Obtenir les obstacles principaux et secondaires
@@ -184,7 +186,7 @@ ROE_Normandie_H <-
   )) %>%
   dplyr::group_by(ROE) %>%
   dplyr::filter(date_mesure == max(date_mesure)) %>%
-  dplyr::filter(hauteur == min(hauteur)) %>%
+  dplyr::filter(hauteur == min(hauteur) | is.na(hauteur)) %>%
   dplyr::ungroup(ROE) %>%
   dplyr::distinct() %>%
   dplyr::mutate(
@@ -202,7 +204,8 @@ ROE_Normandie_H <-
   ) %>%
   dplyr::relocate(c('hauteur', 'classe_hauteur', 'date_mesure'), .after = 'Nom_ouvrage')
 
-## Mettre
+###### Classement des cours d'eau - tronçons de catégorie Liste 2 ######
+
 
 #####Gérer les fautes d'orthographe####
 
@@ -236,4 +239,9 @@ Info <-
 
 ##### Sauvegarder les objets utiles à la réalisation des prochains scripts ####
 
-save(ROE_Normandie_H, Info, file = "data_prepared/ROE_data.RData")
+save(bbox_normandie, # a supprimer par la suite ?
+     normandie_area, # a supprimer par la suite ?
+     ROE_Normandie, # a supprimer par la suite ?
+     ROE_Normandie_H, 
+     Info, 
+     file = "data_prepared/ROE_data.RData")
