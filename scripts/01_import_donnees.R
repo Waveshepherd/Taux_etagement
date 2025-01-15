@@ -62,8 +62,21 @@ Info <-
 
 #### Sélection des données utiles du flux Geobs pour la Normandie ######
 
+# nrow(ROE_Normandie) 9751 lignes
+
 ROE_Normandie <-
   ROE_Normandie %>%
+  dplyr::mutate(dept_nom = dplyr::case_when(
+    identifiant_roe %in% c('ROE14725', 
+                           'ROE117117', 
+                           'ROE119897',
+                           'ROE119898') ~ 'MANCHE',
+    identifiant_roe %in% c('ROE27825', 
+                           'ROE21617') ~ 'CALVADOS',
+    identifiant_roe %in% c('ROE54558',
+                           'ROE88613') ~ 'SEINE-MARITIME',
+    TRUE ~ dept_nom
+  )) %>%
   dplyr::filter(
     dept_nom %in% c('MANCHE', 'CALVADOS', 'SEINE-MARITIME', 'ORNE', 'EURE'),
     statut_nom != 'Gelé'
@@ -117,27 +130,57 @@ ROE_Normandie <-
   )
 
 
-## Choix de se baser la BD topo pour le nom des cours d'eau ##
+## Choix de se baser sur la BD Topo (= BD topage) pour le nom des cours d'eau ##
+
+# ROE_Normandie <-
+#   ROE_Normandie %>%
+#   dplyr::mutate(
+#     nom_carthage = dplyr::case_when(!is.na(nom_carthage) ~ nom_carthage,
+#                                     TRUE ~ 'NA'),
+#     nom_topo = dplyr::case_when(is.na(nom_topo) ~ "NA",
+#                                 nom_topo == 'NR' ~ 'NA',
+#                                 TRUE ~ nom_topo),
+#     nom_topo = dplyr::case_when(
+#       nom_carthage != 'NA' & nom_topo == 'NA' ~ nom_carthage,
+#       TRUE ~ nom_topo),
+#     nom_topo = gsub("fleuve ", "", nom_topo),
+#     nom_topo = gsub("rivière ", "", nom_topo),
+#     nom_topo = gsub(" fleuve", "", nom_topo),
+#     nom_topo = gsub(" rivière", "", nom_topo),
+#     nom_topo = stringr::str_replace_all(nom_topo, pattern = "[[:punct:]]", replacement = " ")
+#   ) %>%
+#   #dplyr::select(!(nom_carthage)) %>%
+#   dplyr::rename("nom_CE" = "nom_topo")
 
 ROE_Normandie <-
-  ROE_Normandie %>%
+  ROE_Normandie %>% 
   dplyr::mutate(
-    nom_carthage = dplyr::case_when(!is.na(nom_carthage) ~ nom_carthage,
-                                    TRUE ~ 'NA'),
-    nom_topo = dplyr::case_when(is.na(nom_topo) ~ "NA",
-                                nom_topo == 'NR' ~ 'NA',
-                                TRUE ~ nom_topo),
-    nom_topo = dplyr::case_when(
-      nom_carthage != 'NA' & nom_topo == 'NA' ~ nom_carthage,
-      TRUE ~ nom_topo),
-    nom_topo = gsub("fleuve ", "", nom_topo),
-    nom_topo = gsub("rivière ", "", nom_topo),
-    nom_topo = gsub(" fleuve", "", nom_topo),
-    nom_topo = gsub(" rivière", "", nom_topo),
-    nom_topo = stringr::str_replace_all(nom_topo, pattern = "[[:punct:]]", replacement = " ")
-  ) %>%
-  dplyr::select(!(nom_carthage)) %>%
-  dplyr::rename("nom_CE" = "nom_topo")
+    nom_CE = dplyr::case_when(
+      is.na(nom_topo) & is.na(nom_carthage) ~ 'NA',
+      nom_topo == 'NR' & !is.na(nom_carthage) ~ nom_carthage,
+      is.na(nom_topo) & !is.na(nom_carthage)~ nom_carthage,
+      nom_topo == 'NR' ~ 'NA',
+      TRUE ~ nom_topo
+    )
+  ) %>% 
+  dplyr::mutate(
+    # cas des rivières / garde rivière quand pronom "de|d'|du"
+    nom_CE = gsub("^rivière(?! (de|d'|du)\\b)\\s*", "", nom_CE, perl = TRUE), 
+    # cas de rivière quand situé en fin de nom
+    nom_CE = gsub("canal des moulins rivière", "canal des moulins", nom_CE),
+    # cas des fleuves quand en début de nom
+    nom_CE = gsub("^fleuve\\s*","",nom_CE, perl = TRUE),
+    # l'aure inférieure
+    nom_CE = gsub("\\s*inférieure$", "", nom_CE),
+    # cas de la soulle -> la soulles
+    nom_CE = gsub("la soulle$", "la soulles", nom_CE),
+    # cas de ruisseau de neauphe sous essai -> ruisseau de neauphe-sous-essai
+    nom_CE = gsub("ruisseau de neauphe sous essai", "ruisseau de neauphe-sous-essai", nom_CE),
+    # cas de l'hyères -> l'yères
+    nom_CE = gsub("l'hyères", "l'yères", nom_CE)
+  ) %>% 
+  dplyr::relocate(nom_CE, .before = 'nom_topo')
+
 
 # Obtenir les obstacles principaux et secondaires
 
@@ -152,6 +195,7 @@ ROE_Normandie <-
   ROE_Normandie %>%
   dplyr::mutate(
     ouv_liaison  = dplyr::case_when(
+      is.na(ouvrages_lies) & stringr::str_detect(ROE, ouvrages_lies_liste, negate = TRUE) ~ "ouvrage principal",
       stringr::str_detect(ROE, ouvrages_lies_liste) ~ "ouvrage secondaire",
       is.na(ouvrages_lies) ~ "ouvrage principal",
       TRUE ~ "ouvrage principal"
@@ -187,7 +231,7 @@ ROE_Normandie_H <-
   )) %>%
   dplyr::group_by(ROE) %>%
   dplyr::filter(date_mesure == max(date_mesure)) %>%
-  dplyr::filter(hauteur == min(hauteur)) %>%
+  dplyr::filter(hauteur == min(hauteur) | is.na(hauteur)) %>%
   dplyr::ungroup(ROE) %>%
   dplyr::distinct() %>%
   dplyr::mutate(
@@ -205,14 +249,10 @@ ROE_Normandie_H <-
   ) %>%
   dplyr::relocate(c('hauteur', 'classe_hauteur', 'date_mesure'), .after = 'Nom_ouvrage')
 
-## Mettre
+###### Classement des cours d'eau - tronçons de catégorie Liste 2 ######
 
-#####Gérer les fautes d'orthographe####
 
-ROE_Normandie_H <-
-  ROE_Normandie_H %>% 
-  dplyr::mutate(nom_CE = dplyr::case_when(nom_CE == "l'hyères" ~ "l'yères",
-                                          TRUE ~ nom_CE))
+
 
 ##### Obtention des métriques du cours d'eau à partir de PHRYMO #####
 
@@ -239,4 +279,9 @@ Info <-
 
 ##### Sauvegarder les objets utiles à la réalisation des prochains scripts ####
 
-save(ROE_Normandie_H, Info, file = "data_prepared/ROE_data.RData")
+save(bbox_normandie, # a supprimer par la suite ?
+     normandie_area, # a supprimer par la suite ?
+     ROE_Normandie, # a supprimer par la suite ?
+     ROE_Normandie_H, 
+     Info, 
+     file = "data_prepared/ROE_data.RData")

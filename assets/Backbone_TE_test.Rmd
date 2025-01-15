@@ -8,7 +8,7 @@ output:
     number_sections: TRUE
     css: "style.css"
 params: 
-  CE: "la douve"
+  CE: "boulleville"
 editor_options: 
   chunk_output_type: console
 ---
