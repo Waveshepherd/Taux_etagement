@@ -5,10 +5,11 @@ date:  "`r format(Sys.time(), '%d %B %Y')`"
 output: 
   html_document:
     highlight: pygment
-    number_sections: TRUE
     css: "style.css"
+runtime : shiny 
 params: 
-  CE: "boulleville"
+  CE: 
+    value: "l'yères"
 editor_options: 
   chunk_output_type: console
 ---
@@ -21,40 +22,94 @@ knitr::opts_chunk$set(
   )
 
 library(tidyverse)
+library(sf)
 
-load("../data/data.RData")
+load("../data_prepared/ROE_data.RData")
 
 ```
 <br>
 
-# [Situation du cours d'eau]{.underline}
+# [Outil de valiration du Taux d'étagement]{.underline}{.tabset}
+
+## [Résumé à l'échelle de la région]{.underline}
+
+### [Tableau résumé des cours classés L2 mis en qualité]{.underline}
+
+
+
+```{r Tab résumé CE L2}
+
+'%>%' <- dplyr::'%>%'
+
+#Obtention du code ME pour le tableau résumé
+
+tab_me <-
+  ROE_Normandie_H %>%  sf::st_drop_geometry() %>%
+  dplyr::mutate(nom_CE = dplyr::case_when(nom_CE == "NA" ~ NA,
+                                                               TRUE ~ nom_CE)) %>% 
+  tidyr::separate(col =  tidyr::matches("code_ME"),
+                  sep = '-',
+                  c("code_ME", "code_CE")) %>%
+  dplyr::select("nom_CE", "code_ME") %>% 
+  unique() %>%
+  na.omit() %>%
+   dplyr::group_by(nom_CE) %>% 
+  dplyr::summarise_all(~ paste(., collapse = ' - ')) 
+
+Info <- dplyr::left_join(Info, tab_me, dplyr::join_by('nom_CE'))
+
+#Calcul du TE pour le tableau résumé
+
+#Hauteurs artificielles cumulées
+tab_h <- ROE_Normandie_H %>%  sf::st_drop_geometry() %>% 
+  dplyr::filter(hauteur != is.na(hauteur)) %>% 
+  dplyr::group_by(nom_CE) %>% 
+  dplyr::mutate(H_cum = sum(hauteur)) %>% 
+  dplyr::select("nom_CE", "H_cum") %>% 
+  unique()
+  
+Info <- dplyr::left_join(Info, tab_h, dplyr::join_by('nom_CE'))
+
+#Obtention du TE
+
+Info <- Info %>% dplyr::mutate(TE = round(H_cum/deni_nat*100,2)) %>% 
+  dplyr::relocate("code_ME", .before =  "nom_CE") %>% 
+  dplyr::relocate("TE", .before =  "H_cum") 
+
+Info <- Info %>% dplyr::filter(nom_CE %in% ROE_Normandie_H$nom_CE) # à retirer
+
+DT::datatable(Info, colnames = c(
+    "Code de la Masse d'eau",
+    "Nom du cours d'eau",
+    "Longueur du cours d'eau (en km)",
+    "Altitute du point le plus en aval (en m)",
+    "Altitude du point le plus en amont (en m)",
+    "Dénivelé naturel (en m)",
+    "Pente naturelle (en ‰)",
+    "Taux d'étagement (en %)",
+    "Hauteurs artificielles cumulées"
+  ))
+
+```
+
+
+<br>
+
+## [Sélection d'un cours d'eau]{.underline}
+
+### [Situation du cours d'eau]{.underline}
 
 <br>
 
 ```{r Info CE}
 
-'%>%' <- dplyr::'%>%'
 
 
-tab_me <-
-  ROE_Normandie_H %>%  dplyr::mutate(nom_CE = dplyr::case_when(nom_CE == "NA" ~ NA,
-                                                               TRUE ~ nom_CE)) %>%
-  tidyr::separate(col =  tidyr::matches("code_ME"),
-                  sep = '-',
-                  c("code_ME", "code_CE")) %>%
-  dplyr::select("nom_CE", "code_ME")  %>%
-  unique() %>%
-  na.omit() %>%
-  dplyr::group_by(nom_CE) %>%
-  dplyr::summarise_all( ~ paste(., collapse = ' - '))
-
-Info <- dplyr::left_join(Info, tab_me, dplyr::join_by('nom_CE'))
-Info_CE <-
-  Info %>%  dplyr::relocate(c('code_ME'), .before = 'nom_CE') %>% 
-  dplyr::filter(nom_CE == params$CE)
+Info_CE <- 
+  Info_CE <- Info %>%  dplyr::filter(nom_CE == params$CE) %>% 
+  dplyr::select(!c("TE","H_cum"))
   
-
-kableExtra::kbl(
+  kableExtra::kbl(
   Info_CE,
   col.names = c(
     "Code de la Masse d'eau",
@@ -68,23 +123,30 @@ kableExtra::kbl(
 ) %>%
   kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
 
+
+
+
+
 ```
 
 <br>
 
-# [Nombre d'ouvrages]{.underline}
+### [Nombre d'ouvrages]{.underline}
 
 <br>
 
 ```{r Info ouvrages}
 
-tab_CE <-
-  ROE_Normandie_H %>% dplyr::filter(stringr::str_detect(nom_CE, params$CE)) %>%  sf::st_drop_geometry()
+tab_CE <- 
+  ROE_Normandie_H %>% dplyr::filter(nom_CE == params$CE) %>%  sf::st_drop_geometry()
 
-ouv_p <-
-  tab_CE %>% dplyr::filter(ouv_liaison == "ouvrage principal") %>%  sf::st_drop_geometry()
 
-tab_ouv <-
+ouv_p <- 
+  tab_CE %>% dplyr::filter(ouv_liaison == "ouvrage principal")
+
+
+
+tab_ouv <- 
   ouv_p %>% 
   dplyr::mutate(nb_ouv = nrow(tab_CE),
                 nb_ouvp = nrow(ouv_p),
@@ -92,13 +154,14 @@ tab_ouv <-
   dplyr::select(nom_CE, nb_ouv, nb_ouvp, d_ouvp) %>% 
   unique()
 
+
 kableExtra::kbl(
   tab_ouv,
   col.names = c(
     "Nom du cours d'eau",
     "Nombre d'ouvrages",
     "Nombre d'ouvrages sur le cours principal",
-    "Densité d'ouvarge sur le cours le cours principal par km"
+    "Densité d'ouvarge sur le cours principal par km"
   )
 ) %>%
   kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
@@ -107,7 +170,7 @@ kableExtra::kbl(
 
 <br>
 
-# [Répartition des hauteurs de chute]{.underline}
+### [Répartition des hauteurs de chute]{.underline}
 
 <br>
 
@@ -141,7 +204,7 @@ Ce graphique présente le nombre d'ouvrage par intervals de hauteur de chute pr�
 
 <br>
 
-# [État des ouvrage sur le cours principal]{.underline}
+### [État des ouvrage sur le cours principal]{.underline}
 
 <br>
 
@@ -163,7 +226,7 @@ kableExtra::kbl(tab_etat) %>%
 
 <br>
 
-# [Taux d'étagement]{.underline}
+### [Taux d'étagement]{.underline}
 
 <br>
 
@@ -204,7 +267,7 @@ kableExtra::kbl(
 
 <br>
 
-# [Carte du cours d'eau]{.underline}
+### [Carte du cours d'eau]{.underline}
 
 <br>
 
@@ -213,7 +276,7 @@ kableExtra::kbl(
 
 
 tab_CE <-
-  ROE_Normandie_H %>% dplyr::filter(stringr::str_detect(nom_CE, params$CE)) %>%
+  ROE_Normandie_H %>% dplyr::filter(nom_CE == params$CE) %>%
   sf::st_as_sf(crs = 4326)
 
 leaflet::leaflet(tab_CE) %>%
@@ -235,11 +298,10 @@ leaflet::leaflet(tab_CE) %>%
 ```
 </center>
 
-# [Liste des ROE présents sur le cours d'eau]{.underline}
+### [Liste des ROE présents sur le cours d'eau]{.underline}
 
 ```{r Affichage ROE du CE}
 
 DT::datatable(tab_CE)
 
 ```
-

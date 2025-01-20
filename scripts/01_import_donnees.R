@@ -275,7 +275,9 @@ Info <-
   ) %>%
   dplyr::mutate_if(is.numeric, round, 2) %>%
   dplyr::ungroup(nom_CE) %>%
-  dplyr::distinct()
+  dplyr::distinct() %>%
+  #filtrer pour les cours d'eau qui nous intéressent 
+  dplyr::filter(nom_CE %in% ROE_Normandie_H$nom_CE)
 
 ##### Sauvegarder les objets utiles à la réalisation des prochains scripts ####
 
