@@ -279,6 +279,24 @@ Info <-
   #filtrer pour les cours d'eau qui nous intéressent 
   dplyr::filter(nom_CE %in% ROE_Normandie_H$nom_CE)
 
+#Obtention du code ME pour Info
+tab_me <-
+  ROE_Normandie_H %>%  sf::st_drop_geometry() %>%
+  dplyr::mutate(nom_CE = dplyr::case_when(nom_CE == "NA" ~ NA,
+                                          TRUE ~ nom_CE)) %>% 
+  tidyr::separate(col =  tidyr::matches("code_ME"),
+                  sep = '-',
+                  c("code_ME", "code_CE")) %>%
+  dplyr::select("nom_CE", "code_ME") %>% 
+  unique() %>%
+  na.omit() %>%
+  dplyr::group_by(nom_CE) %>% 
+  dplyr::summarise_all(~ paste(., collapse = ' - ')) 
+
+Info <- dplyr::left_join(Info, tab_me, dplyr::join_by('nom_CE'))
+
+Info <- dplyr::relocate(Info,"code_ME", .before =  "nom_CE")
+
 ##### Sauvegarder les objets utiles à la réalisation des prochains scripts ####
 
 save(bbox_normandie, # a supprimer par la suite ?
