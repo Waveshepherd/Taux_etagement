@@ -221,11 +221,14 @@ server <- function(input, output) {
   output$downloadData <- downloadHandler(
     filename = "fiche_TE.pdf",
     content = function(file) {
-      tempReport <- file.path(tempdir(), "report.Rmd")
-      file.copy("report.Rmd", tempReport, overwrite = TRUE)
-    }
-  )
-  
+      
+      params <- list(CE =CE())
+      
+      rmarkdown::render(input = '~/assets/test.Rmd',
+                        output_file = 'Test.pdf',
+                        params = params,
+                        envir = new.env())
+    })
 
 }
 
