@@ -1,17 +1,12 @@
 ---
-title: "Untitled"
+title: "Fiche résumé sur la situation du cours d'eau ainsi que son Taux d'étagement"
+author: "DR Normandie"
+date:  "`r format(Sys.time(), '%d %B %Y')`"
 output: 
-  pdf_document :
-    toc: true
-    toc_depth: 2
-    number_sections: true
-    keep_tex: yes
-latex_engine: pdflatex
-header-includes:
-  \usepackage{booktabs}
-date: "2025-01-30"
-params: 
-  CE: "la béthune"
+  word_document :
+    reference_docx: template_TE.docx
+params:
+  CE: "la bresle"
 always_allow_html: true
 ---
 
@@ -27,8 +22,13 @@ library(sf)
 
 load("../data_prepared/ROE_data.RData")
 
+'%>%' <- dplyr::'%>%'
+
 ```
-<br>
+
+```{=openxml}
+<w:p><w:r><w:br w:type="page"/></w:r></w:p>
+```
 
 # [Situation du cours d'eau]{.underline}
 
@@ -36,19 +36,10 @@ load("../data_prepared/ROE_data.RData")
 
 ```{r Info CE}
 
-'%>%' <- dplyr::'%>%'
-
 
 Info_CE <- Info %>%  dplyr::filter(nom_CE == params$CE)
 
 L_Info_CE <- Info_CE  %>% knitr::kable(
-    format = "latex",
-    align = "r",
-    booktabs = TRUE,
-    longtable = TRUE,
-    centering = TRUE,
-    linesep = "",
-    escape = FALSE,
     col.names = c(
       "Code de la Masse d'eau",
       "Nom du cours d'eau",
@@ -56,11 +47,7 @@ L_Info_CE <- Info_CE  %>% knitr::kable(
       "Altitute du point le plus en aval (en m)",
       "Altitude du point le plus en amout (en m)",
       "Dénivelé naturel (en m)",
-      "Pente naturelle (en ‰)")) %>%
-  kableExtra::kable_styling(position = "left",
-      latex_options = c("striped", "repeat_header"),
-      stripe_color = "gray!15",
-    ) %>% kableExtra::column_spec(column = 1:7, width="2cm")
+      "Pente naturelle (en ‰)"))
 
 L_Info_CE
 
@@ -89,23 +76,12 @@ tab_ouv <-
   dplyr::select(nom_CE, nb_ouv, nb_ouvp, d_ouvp) %>% 
   unique() %>% 
     knitr::kable(
-    format = "latex",
-    align = "r",
-    booktabs = TRUE,
-    centering = TRUE,
-    longtable = TRUE,
-    linesep = "",
     col.names = c(
       "Nom du cours d'eau",
     "Nombre d'ouvrages",
     "Nombre d'ouvrages sur le cours principal",
     "Densité d'ouvarge sur le cours principal par km"
-    )) %>%
-  kableExtra::kable_styling(position = "left",
-      latex_options = c("striped", "repeat_header"),
-      stripe_color = "gray!15"
-    ) %>% kableExtra::column_spec(column = 1:4, width="4cm")
-
+    ))
 tab_ouv
 
 ```
@@ -161,15 +137,6 @@ tab_etat <- ouv_p %>%
     "Proportion (en %)" = "prop"
   ) %>% 
   knitr::kable(
-    format = "latex",
-    align = "r",
-    booktabs = TRUE,
-    longtable = TRUE,
-    centering = TRUE,
-    linesep = "") %>%
-  kableExtra::kable_styling(position = "left",
-      latex_options = c("striped", "repeat_header"),
-      stripe_color = "gray!15"
     )
 tab_etat
       
@@ -201,15 +168,6 @@ tab_TE <- ouv_p %>%
     "Rapport des hauteurs cumulées sur la pente naturelle (en %)" = "prop"
   ) %>% 
   knitr::kable(
-    format = "latex",
-    align = "r",
-    booktabs = TRUE,
-    centering = TRUE,
-    longtable = TRUE,
-    linesep = "") %>%
-  kableExtra::kable_styling(position = "left",
-      latex_options = c("striped", "repeat_header"),
-      stripe_color = "gray!15"
     )
 tab_TE
 ```
@@ -232,6 +190,9 @@ tab_CE <-
   ROE_Normandie_H %>% dplyr::filter(nom_CE == params$CE) %>%
   sf::st_as_sf(crs = 4326)
 
+pal <- leaflet::colorFactor(palette = c("blue","red","green"),
+                               domain = tab_CE$etat)
+
 map <- leaflet::leaflet(tab_CE) %>%
   leaflet::addTiles() %>%
   leaflet::addCircleMarkers(
@@ -243,6 +204,7 @@ map <- leaflet::leaflet(tab_CE) %>%
       "Hauteur de chute de l'ouvrage : ",tab_CE$hauteur," m"
     ),
     radius = 6,
+    color = ~pal(tab_CE$etat),
     stroke = FALSE,
     fillOpacity = 0.8
   )

@@ -1,5 +1,5 @@
 ---
-title: "![](OFB_Logo.jpg){width=25%} Tableau récapitulatif des différents cours d'eau classé en liste 2 et mis en qualités dans Geobs"
+title: "Tableau récapitulatif des différents cours d'eau classé en liste 2 et mis en qualités dans Geobs"
 date:  "`r format(Sys.time(), '%d %B %Y')`"
 output:
   pdf_document: default

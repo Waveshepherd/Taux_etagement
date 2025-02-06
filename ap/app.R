@@ -24,6 +24,21 @@ ui <- page_fluid(
   # Application title
   titlePanel("Taux d'étagement à l'échelle d'un cours d'eau"),
   
+  
+  navset_tab(
+    
+    # Panel with plot ----
+    nav_panel("Tableau résumé région",
+
+    # Titre du tableau résumé
+    tags$h1("Situation à l'échelle de la région"),
+    
+    # Tableau des infos topographiques du cours d'eau
+    DT::dataTableOutput(outputId = "tab_region")),
+    
+    # Panel with table ----
+    nav_panel("Fiche cours d'eau",
+  
   # Sélection des inputs
   inputPanel(
     # Selection du CE
@@ -72,9 +87,9 @@ ui <- page_fluid(
   leaflet::leafletOutput("map"),
   
   #Télécharger la fiche au format PDF
-  downloadButton("downloadData", "Télécharger la fiche au format .pdf")
-  
-  
+  downloadButton("your_output", "Télécharger la fiche au format .docx")
+    )
+  )
 )
 
 
@@ -104,6 +119,42 @@ server <- function(input, output) {
   
   
   ### Création des tableaux de rendus
+  
+  output$tab_region <- DT::renderDataTable({
+    tab_h <- ROE_Normandie_H %>%  sf::st_drop_geometry() %>% 
+      dplyr::filter(hauteur != is.na(hauteur),
+                    nom_CE != "NA") %>% 
+      dplyr::group_by(nom_CE) %>% 
+      dplyr::add_count(nom_CE, name = "nb_ouv") %>% 
+      dplyr::mutate(H_cum = sum(hauteur)) %>% 
+      dplyr::filter(ouv_liaison == "ouvrage principal") %>% 
+      dplyr::add_count(nom_CE, name = "nb_ouvp") %>% 
+      dplyr::ungroup() %>% 
+      dplyr::select("nom_CE", "H_cum", "nb_ouv", "nb_ouvp") %>% 
+      unique()
+    
+    tab_region <- dplyr::left_join(Info, tab_h, dplyr::join_by('nom_CE'))
+    
+     
+    #Obtention du TE
+    
+    tab_region <- tab_region  %>% dplyr::mutate(TE = round(H_cum/deni_nat*100,2)) %>% 
+      dplyr::relocate("nb_ouvp","nb_ouv", .before =  "H_cum") %>% dplyr::rename(    "Code de la Masse d'eau" ="code_ME",
+                                                                                    "Nom du cours d'eau"="nom_CE",
+                                                                                    "Longueur du cours d'eau (en km)"="longueur",
+                                                                                    "Altitute du point le plus en aval (en m)"="alt_av",
+                                                                                    "Altitude du point le plus en amont (en m)"="alt_am",
+                                                                                    "Dénivelé naturel (en m)"="deni_nat",
+                                                                                    "Pente naturelle (en ‰)"="pt_nat",
+                                                                                    "Nombre d'ouvrages"="nb_ouv",
+                                                                                    "Nombre d'ouvrages sur le cours principal"="nb_ouvp",
+                                                                                    "Hauteurs artificielles cumulées"="H_cum",
+                                                                                    "Taux d'étagement (en %)"="TE")
+    
+    
+    
+  }) 
+  
   
   #Tableau des infos topographiques du cours d'eau
   output$tab_info <- renderTable({
@@ -218,19 +269,23 @@ server <- function(input, output) {
       )
   })
   
-  output$downloadData <- downloadHandler(
-    filename = "fiche_TE.pdf",
+  
+  output$your_output <- downloadHandler(
+    filename = function() {
+      "output_title.docx"
+    },
     content = function(file) {
-      
-      params <- list(CE =CE())
-      
-      rmarkdown::render(input = '~/assets/test.Rmd',
-                        output_file = 'Test.pdf',
-                        params = params,
-                        envir = new.env())
-    })
+      tempReport <- normalizePath("test_word.Rmd")
 
+      # Params
+  params = list(CE = CE())    
+  
+  rmarkdown::render(tempReport, output_file = file, output_format = 'word_document',
+                    params = params,
+                    envir = new.env(parent = globalenv())
+  )
+    }
+  )
 }
-
 # Run the application
 shinyApp(ui = ui, server = server)
