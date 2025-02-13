@@ -45,7 +45,7 @@ ui <- page_fluid(
     shiny::selectInput(
       "CE",
       "Choisir un cours d' eau :",
-      choices = Info$nom_CE,
+      choices = Info$nom_CE_valid,
       selected = "l'yères"
     )
   ),
@@ -79,11 +79,12 @@ ui <- page_fluid(
   
   # Tableau présentant la répartition des hauteurs de chutes par état ainsi que le TE
   tableOutput("tab_TE"),
+  textOutput("text_TE"),
   
   # Titre de la première partie
   tags$h1("Carte du cours d'eau"),
   
-  # Tableau présentant la répartition des hauteurs de chutes par état ainsi que le TE
+  # Carte présentant la répartition des ouvrages sur le CE avec les états
   leaflet::leafletOutput("map"),
   
   #Télécharger la fiche au format PDF
@@ -102,13 +103,13 @@ server <- function(input, output) {
   
   ##Tableau des infos topographiques du cours d'eau
   tab_info <- reactive({
-    tab_info <- dplyr::filter(Info, Info$nom_CE == CE())
+    tab_info <- dplyr::filter(Info, Info$nom_CE_valid == CE())
   })
   
   #Sélection des informations du tableau ROE_Normandie_H relatives à notre CE
   tab_CE <- reactive({
     tab_CE <-
-      ROE_Normandie_H %>% dplyr::filter(nom_CE == CE()) %>%  sf::st_drop_geometry()
+      ROE_Normandie_H %>% dplyr::filter(nom_CE_valid == CE()) %>%  sf::st_drop_geometry()
   })
   
   #Sélection des ouvrages situés sur le cours principal du CE
@@ -117,30 +118,20 @@ server <- function(input, output) {
       tab_CE() %>% dplyr::filter(ouv_liaison == "ouvrage principal")
   })
   
+  #Sélection des informations du CE qui nous intéresse
+  
+  tab_info_CE <- reactive({
+    tab_info_CE <-
+      Info %>% dplyr::filter(nom_CE_valid == CE())
+  })
   
   ### Création des tableaux de rendus
   
+  #Tableau résumé des CE de la région
   output$tab_region <- DT::renderDataTable({
-    tab_h <- ROE_Normandie_H %>%  sf::st_drop_geometry() %>% 
-      dplyr::filter(hauteur != is.na(hauteur),
-                    nom_CE != "NA") %>% 
-      dplyr::group_by(nom_CE) %>% 
-      dplyr::add_count(nom_CE, name = "nb_ouv") %>% 
-      dplyr::mutate(H_cum = sum(hauteur)) %>% 
-      dplyr::filter(ouv_liaison == "ouvrage principal") %>% 
-      dplyr::add_count(nom_CE, name = "nb_ouvp") %>% 
-      dplyr::ungroup() %>% 
-      dplyr::select("nom_CE", "H_cum", "nb_ouv", "nb_ouvp") %>% 
-      unique()
-    
-    tab_region <- dplyr::left_join(Info, tab_h, dplyr::join_by('nom_CE'))
-    
-     
-    #Obtention du TE
-    
-    tab_region <- tab_region  %>% dplyr::mutate(TE = round(H_cum/deni_nat*100,2)) %>% 
-      dplyr::relocate("nb_ouvp","nb_ouv", .before =  "H_cum") %>% dplyr::rename(    "Code de la Masse d'eau" ="code_ME",
-                                                                                    "Nom du cours d'eau"="nom_CE",
+    tab_region <- 
+      Info %>% dplyr::relocate("nb_ouvp","nb_ouv", .before =  "H_cum") %>% dplyr::rename(    "Code de la Masse d'eau" ="code_ME_valid",
+                                                                                    "Nom du cours d'eau"="nom_CE_valid",
                                                                                     "Longueur du cours d'eau (en km)"="longueur",
                                                                                     "Altitute du point le plus en aval (en m)"="alt_av",
                                                                                     "Altitude du point le plus en amont (en m)"="alt_am",
@@ -158,8 +149,8 @@ server <- function(input, output) {
   
   #Tableau des infos topographiques du cours d'eau
   output$tab_info <- renderTable({
-    tab_info <- Info %>%  dplyr::filter(Info$nom_CE == CE()) %>% dplyr::rename(    "Code de la Masse d'eau" ="code_ME",
-                                                                               "Nom du cours d'eau"="nom_CE",
+    tab_info <- Info %>%  dplyr::filter(Info$nom_CE_valid == CE()) %>% dplyr::select(code_ME_valid:pt_nat) %>% dplyr::rename(    "Code de la Masse d'eau" ="code_ME_valid",
+                                                                               "Nom du cours d'eau"="nom_CE_valid",
                                                                                "Longueur du cours d'eau (en km)"="longueur",
                                                                                "Altitute du point le plus en aval (en m)"="alt_av",
                                                                                "Altitude du point le plus en amont (en m)"="alt_am",
@@ -179,8 +170,8 @@ server <- function(input, output) {
         nb_ouvp = nrow(ouv_p()),
         d_ouvp = round(nrow(ouv_p()) / tab_info()$longueur, 2)
       ) %>%
-      dplyr::select(nom_CE, nb_ouv, nb_ouvp, d_ouvp) %>%
-      unique() %>% dplyr::rename("Nom du cours d'eau"="nom_CE",
+      dplyr::select(nom_CE_valid, nb_ouv, nb_ouvp, d_ouvp) %>%
+      unique() %>% dplyr::rename("Nom du cours d'eau"="nom_CE_valid",
                                  "Nombre d'ouvrages"="nb_ouv",
                                  "Nombre d'ouvrages sur le cours principal"="nb_ouvp",
                                  "Densité d'ouvarge sur le cours principal par km"="d_ouvp")
@@ -189,9 +180,10 @@ server <- function(input, output) {
   
   #Barplot des classes de hauteurs de chute et de l'état de tous les ouvrages sur le CE
   output$CH <- renderPlot({
-    
+      
     tab_CE() %>% dplyr::filter(!is.na(hauteur)) %>% 
-    ggplot2::ggplot(ggplot2::aes(x = classe_hauteur, fill = etat), na.rm = TRUE) +
+    ggplot2::ggplot(ggplot2::aes(x = classe_hauteur, fill = etat, na.rm = TRUE)) +
+      ggplot2::scale_fill_manual(values = c("green","orange","red")) +
       ggplot2::geom_bar(ggplot2::aes(x = factor(
         classe_hauteur,
         level = c(
@@ -206,7 +198,7 @@ server <- function(input, output) {
         )
       ))) +
       ggplot2::xlab("Intervals de hauteur de chute (m)") + ggplot2::ylab("Nombre d'ouvrages") +
-      ggplot2::labs(fill = "État :")
+      ggplot2::labs(fill = "État :") 
     
   })
   
@@ -222,8 +214,11 @@ server <- function(input, output) {
         "Proportion (en %)" = "prop"
       )
   })
-  
-  #Tableau présentant la répartition des hauteurs de chutes par état ainsi que le TE
+
+  #Text présentant le calcul du TE avec quelques infos
+
+    
+  #Tableau présentant la répartition des hauteurs de chutes par état 
   output$tab_TE <- renderTable({
     
     tab_TE <- ouv_p() %>%
@@ -241,22 +236,44 @@ server <- function(input, output) {
       )
   })
   
+  #Text présentant le TE
+  
+  output$text_TE <- renderText({
+    
+    paste("Le taux d'étagement de la masse d'eau : ", tab_info_CE()$code_ME_valid, " est de : ", tab_info_CE()$TE, "%.")
+          
+  })
+  
+  
   
   output$map <- leaflet::renderLeaflet({
     
     tab_geo <-
-      ROE_Normandie_H %>% dplyr::filter(nom_CE == CE()) %>%
+      ROE_Normandie_H %>% dplyr::filter(nom_CE_valid == CE()) %>%
       sf::st_as_sf(crs = 4326)
     
-    pal <- leaflet::colorFactor(palette = c("blue","red","green"),
+    CE_bdtopo <- CE_bdtopo %>% dplyr::rename("nom_CE_valid"="toponyme") %>% dplyr::select("nom_CE_valid", "geom") %>%
+      dplyr::mutate(nom_CE_valid = tolower(nom_CE_valid),
+                    nom_CE_valid = gsub("fleuve ", "", nom_CE_valid),
+                    nom_CE_valid = gsub("rivière ", "", nom_CE_valid),
+                    nom_CE_valid = gsub("^bras de\\s*", "", nom_CE_valid, perl = TRUE),
+                    nom_CE_valid = gsub("^bras du\\s*", "le ", nom_CE_valid, perl = TRUE),
+                    nom_CE_valid = gsub("^bras la\\s*", "la ", nom_CE_valid, perl = TRUE),
+                    nom_CE_valid = gsub("^rivière(?! (de|d'|du)\\b)\\s*", "", nom_CE_valid, perl = TRUE)) %>% 
+      sf::st_as_sf(crs = 4326) %>% dplyr::filter(nom_CE_valid == CE()) 
+    
+    pal <- leaflet::colorFactor(palette = c("green","orange","red"),
                                domain = tab_geo$etat)
     
     map <- leaflet::leaflet(tab_geo) %>%
-      leaflet::addTiles() %>%
+      leaflet::addTiles() %>% 
+      leaflet::addPolylines(data = CE_bdtopo, color = "blue",
+                            opacity = 0.8 ) %>%
       leaflet::addCircleMarkers(
         popup = paste(
           "Code ROE : ",tab_CE()$ROE,"<br/>",
           "Nom de l'ouvrage : ",tab_CE()$Nom_ouvrage,"<br/>",
+          "Lien de l'ouvrage : ",tab_CE()$ouv_liaison,"<br/>",
           "Type d'ouvrage et sous-type : ",tab_CE()$type," ",tab_CE()$sous_type,"<br/>",
           "État de l'ouvrage : ",tab_CE()$etat,"<br/>",
           "Hauteur de chute de l'ouvrage : ",tab_CE()$hauteur," m"
@@ -266,7 +283,12 @@ server <- function(input, output) {
         group = "État des ouvrages",
         stroke = FALSE,
         fillOpacity = 0.8 
+      ) %>%
+      leaflet::addLegend("bottomright", pal = pal, values = ~tab_geo$etat,
+                         title = "État des ouvrages",
+                         opacity = 1
       )
+    
   })
   
   
