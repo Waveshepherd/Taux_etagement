@@ -1,45 +1,52 @@
-#
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    https://shiny.posit.co/
-#
+##%####################################################%##
+#                                                        #
+##    Application de valorisation des BDD ROE et BDOE   ##
+#                                                        #
+##%####################################################%##
 
-
-#Load packages
+##----------------------------------------------------------------------------##
+#### 1. Chargement des packages ####
+##----------------------------------------------------------------------------##
 
 library(shiny)
 library(bslib)
 '%>%' <- dplyr::'%>%'
 
-#Load data
+##----------------------------------------------------------------------------##
+#### 2. Chargement des données ####
+##----------------------------------------------------------------------------##
 
 load("../data_prepared/ROE_data.RData")
 
-# Define UI for application that draws a histogram
+##----------------------------------------------------------------------------##
+#### 3. Front ####
+##----------------------------------------------------------------------------##
 
 ui <- page_fluid(
-  # Application title
+  
+  # Titre de l'application
   titlePanel("Taux d'étagement à l'échelle d'un cours d'eau"),
   
   
   navset_tab(
     
-    # Panel with plot ----
+    # Création des 2 onglets
+    
     nav_panel("Tableau résumé région",
 
-    # Titre du tableau résumé
+## 3.a. Onglet régions ##
+
     tags$h1("Situation à l'échelle de la région"),
     
-    # Tableau des infos topographiques du cours d'eau
+    # Tableau des infos topographiques des cours d'eau de la région
     DT::dataTableOutput(outputId = "tab_region")),
     
-    # Panel with table ----
+## 3.b. Onglet de la fiche résumé à l'échelle d'un CE ##
+
     nav_panel("Fiche cours d'eau",
   
   # Sélection des inputs
+
   inputPanel(
     # Selection du CE
     shiny::selectInput(
@@ -50,53 +57,71 @@ ui <- page_fluid(
     )
   ),
   
-  # Titre de la première partie
+  # Titre de la partie : infos topographiques du cours d'eau
+  
   tags$h1("Situation du cours d'eau"),
   
   # Tableau des infos topographiques du cours d'eau
+  
   tableOutput(outputId = "tab_info"),
   
-  # Titre de la première partie
+  # Titre de la partie : infos sur les ouvrages du CE
+  
   tags$h1("Nombre d'ouvrages"),
   
   # Tableau des infos sur les ouvrages du CE
+  
   tableOutput(outputId = "tab_ouv"),
   
-  # Titre de la première partie
+  # Titre de la partie : qui présente un barplot sur les classes de hauteurs 
+  # de chute et de l'état de tous les ouvrages sur le CE
+  
   tags$h1("Répartition des hauteurs de chute"),
   
   # Barplot des classes de hauteurs de chute et de l'état de tous les ouvrages sur le CE
+  
   plotOutput("CH"),
   
-  # Titre de la première partie
+  # Titre de la partie : répartition de l'état des ouvrages principaux sur le CE
+  
   tags$h1("Répartition de l'état des ouvrage sur le cours principal"),
   
   # Tableau de la répartition de l'état des ouvrages principaux sur le CE
+  
   tableOutput("tab_etat"),
   
-  # Titre de la première partie
+  # Titre de la partie ; répartition des hauteurs de chutes par état ainsi que le TE
+  
   tags$h1("Répartition des hauteurs de chute en fonction de l'état des ouvrages sur le cours principal"),
   
   # Tableau présentant la répartition des hauteurs de chutes par état ainsi que le TE
+  
   tableOutput("tab_TE"),
   textOutput("text_TE"),
   
-  # Titre de la première partie
+  # Titre de la partie : Carte présentant la répartition des ouvrages sur le CE avec les états
+  
   tags$h1("Carte du cours d'eau"),
   
   # Carte présentant la répartition des ouvrages sur le CE avec les états
+  
   leaflet::leafletOutput("map"),
   
-  #Télécharger la fiche au format PDF
+  #Télécharger la fiche au format .docx
+  
   downloadButton("your_output", "Télécharger la fiche au format .docx")
     )
   )
 )
 
 
-# Define server logic required to draw a histogram
+##----------------------------------------------------------------------------##
+#### 4. Back ####
+##----------------------------------------------------------------------------##
+
 server <- function(input, output) {
-  ### Création des objet réactifs ###
+  
+## 4.a. Création des objet réactifs ##
   
   #Le nom du CE
   CE <- reactive(input$CE)
@@ -125,9 +150,10 @@ server <- function(input, output) {
       Info %>% dplyr::filter(nom_CE_valid == CE())
   })
   
-  ### Création des tableaux de rendus
+## 4.a. Création des tableaux de rendus ##
   
   #Tableau résumé des CE de la région
+  
   output$tab_region <- DT::renderDataTable({
     tab_region <- 
       Info %>% dplyr::relocate("nb_ouvp","nb_ouv", .before =  "H_cum") %>% dplyr::rename(    "Code de la Masse d'eau" ="code_ME_valid",
@@ -148,6 +174,7 @@ server <- function(input, output) {
   
   
   #Tableau des infos topographiques du cours d'eau
+  
   output$tab_info <- renderTable({
     tab_info <- Info %>%  dplyr::filter(Info$nom_CE_valid == CE()) %>% dplyr::select(code_ME_valid:pt_nat) %>% dplyr::rename(    "Code de la Masse d'eau" ="code_ME_valid",
                                                                                "Nom du cours d'eau"="nom_CE_valid",
@@ -162,6 +189,7 @@ server <- function(input, output) {
   
   
   #Tableau résumé de la situation des ouvrages sur le CE
+  
   output$tab_ouv <- renderTable({
     tab_ouv <-
       ouv_p() %>%
@@ -179,6 +207,7 @@ server <- function(input, output) {
   })
   
   #Barplot des classes de hauteurs de chute et de l'état de tous les ouvrages sur le CE
+  
   output$CH <- renderPlot({
       
     tab_CE() %>% dplyr::filter(!is.na(hauteur)) %>% 
@@ -203,6 +232,7 @@ server <- function(input, output) {
   })
   
   #Tableau de la répartition de l'état des ouvrages principaux sur le CE
+  
   output$tab_etat <- renderTable({
     
     tab_etat <- ouv_p() %>%
@@ -219,6 +249,7 @@ server <- function(input, output) {
 
     
   #Tableau présentant la répartition des hauteurs de chutes par état 
+  
   output$tab_TE <- renderTable({
     
     tab_TE <- ouv_p() %>%
@@ -245,12 +276,17 @@ server <- function(input, output) {
   })
   
   
+  # Carte présentant la répartition des ouvrages sur le CE avec les états
   
   output$map <- leaflet::renderLeaflet({
+ 
+    #Préparation des points ROE sur la carte du CE 
     
     tab_geo <-
       ROE_Normandie_H %>% dplyr::filter(nom_CE_valid == CE()) %>%
       sf::st_as_sf(crs = 4326)
+    
+    #Sélection du tracer du CE 
     
     CE_bdtopo <- CE_bdtopo %>% dplyr::rename("nom_CE_valid"="toponyme") %>% dplyr::select("nom_CE_valid", "geom") %>%
       dplyr::mutate(nom_CE_valid = tolower(nom_CE_valid),
@@ -262,8 +298,11 @@ server <- function(input, output) {
                     nom_CE_valid = gsub("^rivière(?! (de|d'|du)\\b)\\s*", "", nom_CE_valid, perl = TRUE)) %>% 
       sf::st_as_sf(crs = 4326) %>% dplyr::filter(nom_CE_valid == CE()) 
     
+    #Création de la palette de couleur à utiliser pour la légende
+    
     pal <- leaflet::colorFactor(palette = c("green","orange","red"),
                                domain = tab_geo$etat)
+    #Création de la carte
     
     map <- leaflet::leaflet(tab_geo) %>%
       leaflet::addTiles() %>% 
@@ -291,7 +330,8 @@ server <- function(input, output) {
     
   })
   
-  
+  # Bouton pour télécharger le template sur un CE au format .docx
+
   output$your_output <- downloadHandler(
     filename = function() {
       "output_title.docx"
@@ -299,7 +339,7 @@ server <- function(input, output) {
     content = function(file) {
       tempReport <- normalizePath("test_word.Rmd")
 
-      # Params
+  # Params
   params = list(CE = CE())    
   
   rmarkdown::render(tempReport, output_file = file, output_format = 'word_document',
@@ -309,5 +349,6 @@ server <- function(input, output) {
     }
   )
 }
-# Run the application
+
+# Connection du font et du back
 shinyApp(ui = ui, server = server)
