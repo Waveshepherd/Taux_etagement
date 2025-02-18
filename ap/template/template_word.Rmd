@@ -94,8 +94,8 @@ tab_ouv
 
 ```{r Barplot classe_hauteur et etat, fig.width = 11, fig.height = 6}
 
-ch <-
-  ggplot2::ggplot(tab_CE, ggplot2::aes(x = classe_hauteur, fill = etat)) +
+ch <- tab_CE %>% dplyr::filter(!is.na(hauteur)) %>% 
+  ggplot2::ggplot(ggplot2::aes(x = classe_hauteur, fill = etat)) +
   ggplot2::scale_fill_manual(values = c("green","orange","red")) +
   ggplot2::geom_bar(ggplot2::aes(x = factor(
     classe_hauteur,
@@ -204,7 +204,7 @@ CE_bdtopo <- CE_bdtopo %>% dplyr::rename("nom_CE_valid"="toponyme") %>% dplyr::s
     pal <- leaflet::colorFactor(palette = c("green","orange","red"),
                                domain = tab_CE$etat)
 
-leaflet::leaflet(tab_CE) %>%
+map <- leaflet::leaflet(tab_CE) %>%
   leaflet::addTiles() %>%
   leaflet::addPolylines(data = CE_bdtopo, color = "blue",
                             opacity = 0.8 ) %>%
@@ -226,7 +226,12 @@ leaflet::leaflet(tab_CE) %>%
                          opacity = 1
       )
 
-
+htmlwidgets::saveWidget(widget = map, 
+                        file = "temp.html", 
+                        selfcontained = FALSE)
+webshot::webshot(url = "temp.html", 
+                 file = "map.png", 
+                 cliprect = "viewport")  # cliprect = c(200, 5, 400, 300))
 #library(tmap)
 
 ```
