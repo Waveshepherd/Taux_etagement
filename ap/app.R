@@ -16,7 +16,7 @@ library(bslib)
 #### 2. Chargement des données ####
 ##----------------------------------------------------------------------------##
 
-load("../data_prepared/ROE_data.RData")
+load("../ap/data_prepared/ROE_data.RData")
 
 ##----------------------------------------------------------------------------##
 #### 3. Front ####
@@ -337,7 +337,7 @@ server <- function(input, output) {
       "output_title.docx"
     },
     content = function(file) {
-      tempReport <- normalizePath("test_word.Rmd")
+      tempReport <- normalizePath("template/template_word.Rmd")
 
   # Params
   params = list(CE = CE())    

@@ -202,9 +202,9 @@ CE_bdtopo <- CE_bdtopo %>% dplyr::rename("nom_CE_valid"="toponyme") %>% dplyr::s
   sf::st_as_sf(crs = 4326) %>% dplyr::filter(nom_CE_valid == params$CE) 
     
     pal <- leaflet::colorFactor(palette = c("green","orange","red"),
-                               domain = tab_geo$etat)
+                               domain = tab_CE$etat)
 
-map <- leaflet::leaflet(tab_CE) %>%
+leaflet::leaflet(tab_CE) %>%
   leaflet::addTiles() %>%
   leaflet::addPolylines(data = CE_bdtopo, color = "blue",
                             opacity = 0.8 ) %>%
@@ -221,12 +221,11 @@ map <- leaflet::leaflet(tab_CE) %>%
     stroke = FALSE,
     fillOpacity = 0.8
   ) %>%
-      leaflet::addLegend("bottomleft", pal = pal, values = ~tab_geo$etat,
+      leaflet::addLegend("bottomleft", pal = pal, values = ~tab_CE$etat,
                          title = "État des ouvrages",
                          opacity = 1
       )
 
-map
 
 #library(tmap)
 
