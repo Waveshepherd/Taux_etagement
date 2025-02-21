@@ -52,11 +52,11 @@ bdoe <-
 
 ## 1.c. Chargement des données PHRYMO
 
-Info_LB <- sf::read_sf(
+Info_LB <- vroom::vroom(
   "//ad.intra/dfs/COMMUNS/REGIONS/nor/DR/OFB/SIG/DR/IG_METIER/CONTINUITE/PHRYMO/usra_LB.csv" 
 )
 
-Info_NOR <- sf::read_sf(
+Info_NOR <- vroom::vroom(
   "//ad.intra/dfs/COMMUNS/REGIONS/nor/DR/OFB/SIG/DR/IG_METIER/CONTINUITE/PHRYMO/usra_NOR.csv"
 )
 
@@ -67,8 +67,7 @@ Info <-
 
 CE_bdtopo <- 
   sf::read_sf(
-    "data_prepared/CE_BDTOPO.gpkg"
-  )
+    "ap/data_prepared/CE_BDTOPO.gpkg")
 
 ## 1.f. Chargement des données géographiques des tronçons "Liste 2" à partir du Sandre 
 
@@ -77,12 +76,28 @@ CE_L2_sandre <-
 
 ## 1.g. Chargement des données issues du travail de récup sur les L2
 
-load("data_prepared/L2_reclassif_ROE.RData") ## nom : L2_reclassif_ROE
+load("ap/data_prepared/L2_reclassif_ROE.RData") ## nom : L2_reclassif_ROE
 
 ## 1.h. Chargement des données sur les Masses d'eau (SN et LB)
 
 BV_ME_SN_LB <- 
-  sf::read_sf("data_prepared/BV_ME_SN_LB.gpkg")
+  sf::read_sf("ap/data_prepared/BV_ME_SN_LB.gpkg")
+
+## 1.d. Chargement des données CE de la BD Topo (BDTopage)
+
+CE_L2_lin <- 
+  sf::read_sf(
+    "ap/data_prepared/CE_liste2_lin.gpkg")
+
+## 1.d. Chargement des données CE de la BD Topo (BDTopage)
+
+CE_L2_buff <- 
+  sf::read_sf(
+    "ap/data_prepared/CE_liste2_buff50.gpkg")
+
+Info_L2 <- 
+  sf::read_sf(
+    "ap/data_prepared/usra_SN_LB_L2.gpkg")
 
 ##----------------------------------------------------------------------------##
 #### 2. Sélection des données utiles du flux Geobs pour la Normandie ####
@@ -337,6 +352,22 @@ ROE_Normandie_H <-
       sf::st_drop_geometry()
   )
 
+##Modifications manuelles suite à la réunion du 19/02
+
+ROE_Normandie_H <- 
+  ROE_Normandie_H %>% 
+  dplyr::mutate(ouv_liaison = dplyr::case_when(ROE == "ROE46995" ~ "ouvrage secondaire",
+                                              ROE == "ROE46993" ~ "ouvrage secondaire",
+                                              ROE == "ROE44944" ~ "ouvrage secondaire",
+                                              ROE == "ROE89260" ~ "ouvrage secondaire",
+                                              ROE == "ROE95576" ~ "ouvrage secondaire",
+                                              ROE == "ROE44942" ~ "ouvrage secondaire",
+                                              ROE == "ROE44940" ~ "ouvrage secondaire",
+                                              ROE == "ROE110869" ~ "ouvrage secondaire",
+                                              ROE == "ROE90919" ~ "ouvrage secondaire",
+                                              ROE == "ROE110866" ~ "ouvrage secondaire",
+                                              TRUE ~ ouv_liaison))
+
 ##----------------------------------------------------------------------------##
 #### 7. Masses d'eau - Codes manquants ###
 ##----------------------------------------------------------------------------##
@@ -458,16 +489,14 @@ Info <- dplyr::relocate(Info,"code_ME_valid", .before =  "nom_CE_valid")
 #### 9. Calcul de différentes métriques sur la situation du CE ainsi que son TE #####
 ##---------------------------------------------------------------------------------##
 
-#Calcul du nombre d'ouvrage sur CE, du nombre d'ouvarge sur le cours principal et de la hauteur de chute cuumulée de tous les ouvrages
+#Calcul du nombre d'ouvrage sur CE, du nombre d'ouvarge sur le cours principal et de la hauteur de chute cumulée de tous les ouvrages
 
 tab_h <- ROE_Normandie_H %>%  sf::st_drop_geometry() %>% 
-  dplyr::filter(hauteur != is.na(hauteur),
-                nom_CE_valid != "NA") %>% 
   dplyr::group_by(nom_CE_valid) %>% 
   dplyr::add_count(nom_CE_valid, name = "nb_ouv") %>% 
   dplyr::filter(ouv_liaison == "ouvrage principal") %>% 
   dplyr::add_count(nom_CE_valid, name = "nb_ouvp") %>%
-  dplyr::mutate(H_cum = sum(hauteur)) %>%
+  dplyr::mutate(H_cum = sum(hauteur, na.rm = TRUE)) %>%
   dplyr::ungroup() %>% 
   dplyr::select("nom_CE_valid", "H_cum", "nb_ouv", "nb_ouvp") %>% 
   unique()
@@ -477,8 +506,118 @@ Info <- dplyr::left_join(Info, tab_h, dplyr::join_by('nom_CE_valid'))
 
 #Calcul du TE
 
-Info <- Info %>% dplyr::mutate(TE = round(H_cum/deni_nat*100,2)) %>% 
-  dplyr::relocate("nb_ouvp","nb_ouv", .before =  "H_cum")
+Info <- Info %>% dplyr::mutate(TE = round(H_cum/deni_nat*100,1)) %>% 
+  dplyr::mutate(dplyr::across(3:10, round,0)) %>% 
+  dplyr::relocate("nb_ouv","nb_ouvp", .before =  "H_cum")
+
+#Ajustements dernière minute
+
+Info <- Info %>% dplyr::filter(!is.na(nom_CE_valid)) 
+Info <- Info[order(Info$nom_CE_valid),]
+
+ROE_Normandie_H <- ROE_Normandie_H %>% dplyr::filter(!is.na(nom_CE_valid))
+ROE_Normandie_H <- ROE_Normandie_H[order(ROE_Normandie_H$nom_CE_valid),]
+
+##---------------------------------------------------------------------------------##
+#### 10. Limitation des données aux tronçons de CE classés L2 #####
+##---------------------------------------------------------------------------------##
+
+
+## 10. a. ROE ##
+# 
+# CE_L2_buff <- sf::st_make_valid(CE_L2_buff)
+# 
+# CE_L2_lin <- CE_L2_lin %>% 
+#   dplyr::mutate(
+#     NomZone = tolower(NomZone),
+#     NomZone = gsub("fleuve ", "", NomZone),
+#     NomZone = gsub("rivière ", "", NomZone),
+#     NomZone = gsub("^bras de\\s*", "", NomZone, perl = TRUE),
+#     NomZone = gsub("^bras du\\s*", "le ", NomZone, perl = TRUE),
+#     NomZone = gsub("^bras la\\s*", "la ", NomZone, perl = TRUE),
+#     NomZone = gsub("^rivière(?! (de|d'|du)\\b)\\s*", "", NomZone, perl = TRUE))
+#   
+# ROE_Normandie_H_L2 <- ROE_Normandie_H %>% dplyr::filter(ouv_liste2_valid == "Liste2")
+# 
+# ROE_Normandie_H_L2 <-
+#   sf::st_join(
+#     ROE_Normandie_H_L2,
+#     CE_L2_buff %>% 
+#       dplyr::select(NomZone), join = sf::st_within
+#   ) %>% dplyr::mutate(nom_L2 = dplyr::case_when(
+#     is.na(NomZone) ~ "non",
+#     TRUE ~ "oui"
+#   ))
+# 
+# ROE_Normandie_H_L2_filter <- ROE_Normandie_H_L2 %>% dplyr::filter(!is.na(NomZone))
+# 
+# #Buffer 50 m suffisant ?
+# mapview::mapview(ROE_Normandie_H, zcol = "ouv_liste2_valid") + CE_L2_lin
+# 
+# #Voit que ceux qui sont exclu = en-dehors du tracé
+# mapview::mapview(ROE_Normandie_H_L2, zcol = "nom_L2") + CE_L2_lin
+# 
+# ## 10. b. Info ##
+# 
+# Info_L2 <- Info_L2 %>% sf::st_drop_geometry() %>% 
+#   dplyr::filter(liste2 == "L2") %>% 
+#   dplyr::rename('alt_am' = 'zamont',
+#                 'alt_av' = 'zaval',
+#                 "nom_CE_valid"="toponyme")  %>% 
+#   dplyr::select(nom_CE_valid, longueur, alt_av, alt_am) %>%
+#   dplyr::filter(alt_av != 0) %>%
+#   dplyr::group_by(nom_CE_valid) %>%
+#   dplyr::mutate(nom_CE_valid = gsub("fleuve ", "", nom_CE_valid),
+#                 nom_CE_valid = gsub("rivière ", "", nom_CE_valid),
+#                 nom_CE_valid = gsub("^bras de\\s*", "", nom_CE_valid, perl = TRUE),
+#                 nom_CE_valid = gsub("^bras du\\s*", "le ", nom_CE_valid, perl = TRUE),
+#                 nom_CE_valid = gsub("^bras la\\s*", "la ", nom_CE_valid, perl = TRUE),
+#                 nom_CE_valid = gsub("^rivière(?! (de|d'|du)\\b)\\s*", "", nom_CE_valid, perl = TRUE)) %>%
+#   dplyr::mutate(
+#     longueur = sum(longueur) * 0.001,
+#     alt_am = max(alt_am),
+#     alt_av = min(alt_av),
+#     deni_nat = alt_am - alt_av,
+#     pt_nat = deni_nat / longueur
+#   ) %>%
+#   dplyr::mutate_if(is.numeric, round, 2) %>%
+#   dplyr::ungroup(nom_CE_valid) %>% 
+#   dplyr::distinct() %>% 
+#   #filtrer pour les cours d'eau qui nous intéressent 
+#   dplyr::filter(nom_CE_valid %in% ROE_Normandie_H$nom_CE_valid) 
+# 
+# #Calcul du nombre d'ouvrage sur CE, du nombre d'ouvarge sur le cours principal et de la hauteur de chute cuumulée de tous les ouvrages
+# 
+# tab_h <- ROE_Normandie_H_L2_filter %>%  sf::st_drop_geometry() %>% 
+#   dplyr::filter(hauteur != is.na(hauteur),
+#                 nom_CE_valid != "NA") %>% 
+#   dplyr::group_by(nom_CE_valid) %>% 
+#   dplyr::add_count(nom_CE_valid, name = "nb_ouv") %>% 
+#   dplyr::filter(ouv_liaison == "ouvrage principal") %>% 
+#   dplyr::add_count(nom_CE_valid, name = "nb_ouvp") %>%
+#   dplyr::mutate(H_cum = sum(hauteur)) %>%
+#   dplyr::ungroup() %>% 
+#   dplyr::select("nom_CE_valid", "H_cum", "nb_ouv", "nb_ouvp") %>% 
+#   unique()
+# 
+# Info_L2 <- dplyr::left_join(Info_L2, tab_h, dplyr::join_by('nom_CE_valid'))
+# 
+# 
+# #Calcul du TE
+# 
+# Info_L2 <- Info_L2 %>% dplyr::mutate(TE = round(H_cum/deni_nat*100,2)) %>% 
+#   dplyr::relocate("nb_ouvp","nb_ouv", .before =  "H_cum")
+# 
+# Info_L2 <- Info_L2 %>% dplyr::filter(!is.na(TE)) 
+# Info_L2 <- Info_L2[order(Info_L2$nom_CE_valid),]
+# 
+# ROE_Normandie_H_L2_filter <- ROE_Normandie_H_L2_filter %>% dplyr::filter(!is.na(nom_CE_valid))
+# ROE_Normandie_H_L2_filter <- ROE_Normandie_H_L2_filter[order(ROE_Normandie_H_L2_filter$nom_CE_valid),]
+# 
+# #Manque des tronçons
+# mapview::mapview(Info_L2, color = "red") + CE_L2_lin + mapview::mapview(ROE_Normandie_H_L2_filter, color = "green")
+
+
 
 ##----------------------------------------------------------------------------##
 ##----------------------------------------------------------------------------##
@@ -490,5 +629,7 @@ save(bbox_normandie, # a supprimer par la suite ?
      ROE_Normandie_H,
      CE_bdtopo,
      Info, 
-     file = "data_prepared/ROE_data.RData")
+     CE_L2_lin,
+     ROE_Normandie_H_L2_filter,
+     file = "ap/data_prepared/ROE_data.RData")
 ##----------------------------------------------------------------------------##

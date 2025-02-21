@@ -49,11 +49,11 @@ bdoe <-
 ## Chargement des données PHRYMO ##
 
 Info_LB <- sf::read_sf(
-  "C:/Users/a.soki-makilutila/Desktop/Documents/Taux_etagement/data/usra_LB.gpkg"
+  "C:/Users/a.soki-makilutila/Desktop/Missions/2_Continuité/Taux_etagement/data/usra_LB.gpkg"
 )
 
 Info_NOR <- sf::read_sf(
-  "C:/Users/a.soki-makilutila/Desktop/Documents/Taux_etagement/data/usra_NOR.gpkg"
+  "C:/Users/a.soki-makilutila/Desktop/Missions/2_Continuité/Taux_etagement/data/usra_NOR.gpkg"
 )
 
 Info <- 
