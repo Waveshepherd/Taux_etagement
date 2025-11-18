@@ -2,4 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
-/data/
+/ap/data_prepared
+/output_tL2
+/output_MEl2

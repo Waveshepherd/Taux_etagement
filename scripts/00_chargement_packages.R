@@ -4,16 +4,6 @@
 #                                                          #
 ##%######################################################%##
 
-# if (!require("renv")) install.packages("renv")
-
-#### Fonctionnement de renv ------------------------------------
-### Restaure les packages dans le lockfile :
-# renv::restore()
-
-
-
-### Restaure les packages dans le lockfile :
-
 library(tidyverse)
 #library(tidyr) <- fait partie de tidyverse
 #library(plyr)
@@ -36,3 +26,24 @@ library(rvest)
 
 library(r4geobs)
 library(vroom)
+library(archive)
+library(brew)
+library(ggplot2)
+library(geometries)
+library(htmltools)
+library(htmlwidgets)
+library(leaflet)
+library(magrittr)
+library(purrr)
+library(r4geobs)
+library(RColorBrewer)
+library(raster)
+library(rmarkdown)
+library(selectr)
+library(sf)
+library(stringr)
+library(stringi)
+library(stats)
+library(terra)
+library(yaml)
+
